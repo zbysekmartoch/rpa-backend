@@ -1,38 +1,43 @@
-# RPA Backend API
 
-REST API pro správu produktů, košíků a analýz s autentifikací.
+# Backend for Retail prices analyzer (RPA) project 
 
-## Funkce
+RPA is advanced scalable tool used by Czech Competition Authority for price analysis and detection of anticompetitive behavior.
 
-- 🔐 JWT autentifikace
-- 📦 Správa produktů
-- 🛒 Správa košíků
-- 📊 Analýzy s workflow skripty
-- 📁 Export výsledků do ZIP
-- 🔒 Bezpečnostní middleware (helmet, cors, rate limiting)
+## RPA Backend API
 
-## Technologie
+Impelements REST API for managing products, baskets, and analyses with JWT authentication.
+
+## Features
+
+- 🔐 JWT Authentication
+- 📦 Product Management
+- 🛒 Basket Management
+- 📊 Analysis with Workflow Scripts
+- 📁 ZIP Export of Results
+- 🔒 Security Middleware (helmet, cors, rate limiting)
+
+## Technologies
 
 - **Backend**: Node.js, Express, MySQL
-- **Autentifikace**: JWT, bcrypt
-- **Bezpečnost**: Helmet, CORS, Rate limiting
-- **Databáze**: MySQL/MariaDB
+- **Authentication**: JWT, bcrypt
+- **Security**: Helmet, CORS, Rate limiting
+- **Database**: MySQL/MariaDB
 
-## Instalace
+## Installation
 
 ```bash
-# Klonuj repository
+# Clone repository
 git clone https://github.com/zbysekmartoch/rpa-backend.git
 cd rpa-backend
 
-# Nainstaluj závislosti
+# Install dependencies
 npm install
 
-# Nastav environment variables
+# Set up environment variables
 cp .env.example .env
-# Uprav .env podle svých potřeb
+# Edit .env with your configuration
 
-# Spusť server
+# Start server
 npm start
 ```
 
@@ -43,56 +48,59 @@ NODE_ENV=development
 PORT=3000
 DB_HOST=localhost
 DB_USER=root
-DB_PASSWORD=
+DB_PASSWORD=your_password
 DB_NAME=rpa_db
 JWT_SECRET=your-super-secret-jwt-key
 CORS_ORIGINS=http://localhost:3000
 ```
 
-## API Endpointy
+## API Endpoints
 
-### Autentifikace
-- `POST /api/v1/auth/login` - Přihlášení
-- `POST /api/v1/auth/register` - Registrace
-- `GET /api/v1/auth/me` - Informace o uživateli
+### Authentication
+- `POST /api/v1/auth/login` - User login
+- `POST /api/v1/auth/register` - User registration  
+- `GET /api/v1/auth/me` - Get current user info
 
-### Produkty
-- `GET /api/v1/products` - Seznam produktů
-- `POST /api/v1/products` - Vytvoření produktu
-- `PUT /api/v1/products/:id` - Aktualizace produktu
-- `DELETE /api/v1/products/:id` - Smazání produktu
+### Products
+- `GET /api/v1/products` - List products
+- `POST /api/v1/products` - Create product
+- `PUT /api/v1/products/:id` - Update product
+- `DELETE /api/v1/products/:id` - Delete product
 
-### Košíky
-- `GET /api/v1/baskets` - Seznam košíků
-- `POST /api/v1/baskets` - Vytvoření košíku
-- `GET /api/v1/baskets/:id/products` - Produkty v košíku
+### Baskets
+- `GET /api/v1/baskets` - List baskets
+- `POST /api/v1/baskets` - Create basket
+- `GET /api/v1/baskets/:id/products` - Get products in basket
+- `POST /api/v1/baskets/:id/products` - Add products to basket
 
-### Analýzy
-- `GET /api/v1/analyses` - Seznam analýz
-- `POST /api/v1/analyses` - Vytvoření analýzy
-- `POST /api/v1/analyses/:id/run` - Spuštění analýzy
+### Analyses
+- `GET /api/v1/analyses` - List analyses
+- `POST /api/v1/analyses` - Create analysis
+- `PUT /api/v1/analyses/:id` - Update analysis
+- `POST /api/v1/analyses/:id/run` - Run analysis
 
-### Výsledky
-- `GET /api/v1/results` - Seznam výsledků
-- `GET /api/v1/results/:id/download` - Stažení ZIP
+### Results
+- `GET /api/v1/results` - List results
+- `GET /api/v1/results/:id` - Get result details
+- `GET /api/v1/results/:id/download` - Download ZIP with results
 
-## Struktura projektu
+## Project Structure
 
 ```
 ├── src/
 │   ├── routes/          # API routes
 │   ├── middleware/      # Express middleware
-│   ├── config.js        # Konfigurace
-│   ├── db.js           # Databázové připojení
-│   └── index.js        # Hlavní server
-├── scripts/            # Skripty pro analýzy
-├── results/            # Výsledky analýz (gitignored)
+│   ├── config.js        # Configuration
+│   ├── db.js           # Database connection
+│   └── index.js        # Main server file
+├── scripts/            # Analysis scripts
+├── results/            # Analysis results (gitignored)
 └── package.json
 ```
 
-## Databáze
+## Database Schema
 
-Potřebné tabulky:
+Required tables:
 
 ```sql
 CREATE TABLE usr (
@@ -142,6 +150,19 @@ CREATE TABLE result (
 );
 ```
 
-## Licence
+## Development
+
+```bash
+# Start in development mode
+npm run dev
+
+# Run linting
+npm run lint
+
+# Run tests
+npm test
+```
+
+## License
 
 MIT
