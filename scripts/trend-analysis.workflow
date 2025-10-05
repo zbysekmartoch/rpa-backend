@@ -1,0 +1,4 @@
+analyzy/prepare_stats.py
+analyzy/plot_index_sladeni.py
+analyzy/plot_sladenost.py
+analyzy/scatterplot_sladenost_cenovy_odstup_b.py

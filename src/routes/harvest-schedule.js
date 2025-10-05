@@ -1,0 +1,403 @@
+import { Router } from 'express';
+import { query } from '../db.js';
+
+const router = Router();
+
+/**
+ * Helper funkce pro volání harvester API
+ */
+async function callHarvesterAPI(host, endpoint, method = 'GET', body = null) {
+  try {
+    const url = `${host.replace(/\/$/, '')}${endpoint}`;
+    const options = {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      timeout: 10000, // 10 sekund timeout
+    };
+
+    if (body && (method === 'POST' || method === 'PUT')) {
+      options.body = JSON.stringify(body);
+    }
+
+    const response = await fetch(url, options);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw new Error(`Harvester API error: ${error.message}`);
+  }
+}
+
+/**
+ * GET /api/v1/harvest-schedule
+ * Seznam všech naplánovaných harvest jobů
+ */
+router.get('/', async (req, res, next) => {
+  try {
+    const { harvester_id, datasource_id } = req.query;
+    const params = [];
+    const conditions = [];
+
+    // Volitelné filtry
+    if (harvester_id) {
+      const id = Number(harvester_id);
+      if (Number.isInteger(id)) {
+        conditions.push('s.harvester_id = ?');
+        params.push(id);
+      }
+    }
+
+    if (datasource_id) {
+      const id = Number(datasource_id);
+      if (Number.isInteger(id)) {
+        conditions.push('s.datasource_id = ?');
+        params.push(id);
+      }
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const rows = await query(
+      `
+      SELECT 
+        s.id, 
+        s.harvester_id, 
+        s.datasource_id, 
+        s.cron_expression,
+        s.created_at,
+        s.updated_at,
+        h.name as harvester_name,
+        h.host as harvester_host,
+        d.name as datasource_name
+      FROM schedule s
+      LEFT JOIN harvester h ON h.id = s.harvester_id
+      LEFT JOIN ds d ON d.id = s.datasource_id
+      ${whereClause}
+      ORDER BY s.id DESC
+      `,
+      params
+    );
+
+    res.json({ items: rows });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * GET /api/v1/harvest-schedule/:id
+ * Detail naplánovaného harvest jobu
+ */
+router.get('/:id', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: 'Invalid id' });
+    }
+
+    const rows = await query(
+      `
+      SELECT 
+        s.id, 
+        s.harvester_id, 
+        s.datasource_id, 
+        s.cron_expression,
+        s.created_at,
+        s.updated_at,
+        h.name as harvester_name,
+        h.host as harvester_host,
+        d.name as datasource_name,
+        d.urls as datasource_urls
+      FROM schedule s
+      LEFT JOIN harvester h ON h.id = s.harvester_id
+      LEFT JOIN ds d ON d.id = s.datasource_id
+      WHERE s.id = ?
+      `,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Schedule not found' });
+    }
+
+    const schedule = rows[0];
+    // Zpracuj URLs z datasource
+    if (schedule.datasource_urls) {
+      schedule.datasource_urls = schedule.datasource_urls.split('\n').map(url => url.trim()).filter(Boolean);
+    }
+
+    res.json(schedule);
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * POST /api/v1/harvest-schedule
+ * Vytvoření nového naplánovaného harvest jobu
+ */
+router.post('/', async (req, res, next) => {
+  try {
+    const { harvester_id, datasource_id, cron_expression } = req.body ?? {};
+    
+    if (!harvester_id || !Number.isInteger(Number(harvester_id))) {
+      return res.status(400).json({ error: 'harvester_id is required and must be integer' });
+    }
+
+    if (!datasource_id || !Number.isInteger(Number(datasource_id))) {
+      return res.status(400).json({ error: 'datasource_id is required and must be integer' });
+    }
+
+    if (!cron_expression || typeof cron_expression !== 'string' || !cron_expression.trim()) {
+      return res.status(400).json({ error: 'cron_expression is required and must be non-empty string' });
+    }
+
+    // Validace cron výrazu (základní)
+    const cronParts = cron_expression.trim().split(/\s+/);
+    if (cronParts.length !== 5) {
+      return res.status(400).json({ error: 'cron_expression must have 5 parts (minute hour day month weekday)' });
+    }
+
+    // Ověříme, že harvester existuje
+    const harvesterExists = await query('SELECT id FROM harvester WHERE id = ?', [harvester_id]);
+    if (harvesterExists.length === 0) {
+      return res.status(400).json({ error: 'Harvester not found' });
+    }
+
+    // Ověříme, že datasource existuje
+    const datasourceExists = await query('SELECT id FROM ds WHERE id = ?', [datasource_id]);
+    if (datasourceExists.length === 0) {
+      return res.status(400).json({ error: 'Data source not found' });
+    }
+
+    const result = await query(
+      'INSERT INTO schedule (harvester_id, datasource_id, cron_expression) VALUES (?, ?, ?)',
+      [harvester_id, datasource_id, cron_expression.trim()]
+    );
+
+    const newSchedule = await query(
+      `
+      SELECT 
+        s.id, 
+        s.harvester_id, 
+        s.datasource_id, 
+        s.cron_expression,
+        s.created_at,
+        s.updated_at,
+        h.name as harvester_name,
+        h.host as harvester_host,
+        d.name as datasource_name,
+        d.urls as datasource_urls
+      FROM schedule s
+      LEFT JOIN harvester h ON h.id = s.harvester_id
+      LEFT JOIN ds d ON d.id = s.datasource_id
+      WHERE s.id = ?
+      `,
+      [result.insertId]
+    );
+
+    const schedule = newSchedule[0];
+
+    // Informuj harvester o novém schedule
+    try {
+      if (schedule.harvester_host && schedule.datasource_urls) {
+        const urls = schedule.datasource_urls.split('\n').map(url => url.trim()).filter(Boolean);
+        
+        await callHarvesterAPI(schedule.harvester_host, '/schedule', 'POST', {
+          harvestingJobId: schedule.id.toString(),
+          urls: urls,
+          cronExpression: schedule.cron_expression
+        });
+      }
+    } catch (apiError) {
+      console.warn(`Failed to notify harvester about new schedule ${schedule.id}:`, apiError.message);
+      // Nepřerušujeme operaci, jen logujeme chybu
+    }
+
+    // Odstraň URLs z response (vrátíme jen základní info)
+    delete schedule.datasource_urls;
+
+    res.status(201).json(schedule);
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * PUT /api/v1/harvest-schedule/:id
+ * Aktualizace naplánovaného harvest jobu
+ */
+router.put('/:id', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: 'Invalid id' });
+    }
+
+    const { harvester_id, datasource_id, cron_expression } = req.body ?? {};
+
+    // Validace
+    if (harvester_id !== undefined && !Number.isInteger(Number(harvester_id))) {
+      return res.status(400).json({ error: 'harvester_id must be integer' });
+    }
+
+    if (datasource_id !== undefined && !Number.isInteger(Number(datasource_id))) {
+      return res.status(400).json({ error: 'datasource_id must be integer' });
+    }
+
+    if (cron_expression !== undefined && (typeof cron_expression !== 'string' || !cron_expression.trim())) {
+      return res.status(400).json({ error: 'cron_expression must be non-empty string' });
+    }
+
+    // Validace cron výrazu
+    if (cron_expression !== undefined) {
+      const cronParts = cron_expression.trim().split(/\s+/);
+      if (cronParts.length !== 5) {
+        return res.status(400).json({ error: 'cron_expression must have 5 parts (minute hour day month weekday)' });
+      }
+    }
+
+    // Sestavíme UPDATE query pouze pro poskytnutá pole
+    const updates = [];
+    const values = [];
+
+    if (harvester_id !== undefined) {
+      // Ověříme, že harvester existuje
+      const harvesterExists = await query('SELECT id FROM harvester WHERE id = ?', [harvester_id]);
+      if (harvesterExists.length === 0) {
+        return res.status(400).json({ error: 'Harvester not found' });
+      }
+      updates.push('harvester_id = ?');
+      values.push(harvester_id);
+    }
+
+    if (datasource_id !== undefined) {
+      // Ověříme, že datasource existuje
+      const datasourceExists = await query('SELECT id FROM ds WHERE id = ?', [datasource_id]);
+      if (datasourceExists.length === 0) {
+        return res.status(400).json({ error: 'Data source not found' });
+      }
+      updates.push('datasource_id = ?');
+      values.push(datasource_id);
+    }
+
+    if (cron_expression !== undefined) {
+      updates.push('cron_expression = ?');
+      values.push(cron_expression.trim());
+    }
+
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    values.push(id);
+    const result = await query(
+      `UPDATE schedule SET ${updates.join(', ')} WHERE id = ?`,
+      values
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Schedule not found' });
+    }
+
+    const updatedSchedule = await query(
+      `
+      SELECT 
+        s.id, 
+        s.harvester_id, 
+        s.datasource_id, 
+        s.cron_expression,
+        s.created_at,
+        s.updated_at,
+        h.name as harvester_name,
+        h.host as harvester_host,
+        d.name as datasource_name,
+        d.urls as datasource_urls
+      FROM schedule s
+      LEFT JOIN harvester h ON h.id = s.harvester_id
+      LEFT JOIN ds d ON d.id = s.datasource_id
+      WHERE s.id = ?
+      `,
+      [id]
+    );
+
+    const schedule = updatedSchedule[0];
+
+    // Informuj harvester o aktualizaci schedule
+    try {
+      if (schedule.harvester_host && schedule.datasource_urls) {
+        const urls = schedule.datasource_urls.split('\n').map(url => url.trim()).filter(Boolean);
+        
+        await callHarvesterAPI(schedule.harvester_host, '/schedule', 'POST', {
+          harvestingJobId: schedule.id.toString(),
+          urls: urls,
+          cronExpression: schedule.cron_expression
+        });
+      }
+    } catch (apiError) {
+      console.warn(`Failed to notify harvester about updated schedule ${schedule.id}:`, apiError.message);
+      // Nepřerušujeme operaci, jen logujeme chybu
+    }
+
+    // Odstraň URLs z response
+    delete schedule.datasource_urls;
+
+    res.json(schedule);
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * DELETE /api/v1/harvest-schedule/:id
+ * Smazání naplánovaného harvest jobu
+ */
+router.delete('/:id', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: 'Invalid id' });
+    }
+
+    // Nejdřív získáme informace o schedule včetně harvester host
+    const scheduleInfo = await query(
+      `
+      SELECT s.id, h.host as harvester_host
+      FROM schedule s
+      LEFT JOIN harvester h ON h.id = s.harvester_id
+      WHERE s.id = ?
+      `,
+      [id]
+    );
+
+    if (scheduleInfo.length === 0) {
+      return res.status(404).json({ error: 'Schedule not found' });
+    }
+
+    const schedule = scheduleInfo[0];
+
+    // Smažeme ze schedule tabulky
+    const result = await query('DELETE FROM schedule WHERE id = ?', [id]);
+
+    // Informuj harvester o smazání schedule
+    try {
+      if (schedule.harvester_host) {
+        await callHarvesterAPI(schedule.harvester_host, `/schedule/${id}`, 'DELETE');
+      }
+    } catch (apiError) {
+      console.warn(`Failed to notify harvester about deleted schedule ${id}:`, apiError.message);
+      // Nepřerušujeme operaci, jen logujeme chybu
+    }
+
+    res.json({ success: true, id });
+  } catch (e) {
+    next(e);
+  }
+});
+
+export default router;

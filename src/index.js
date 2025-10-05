@@ -44,6 +44,10 @@ app.use('/api/v1/products', authenticateToken);
 app.use('/api/v1/baskets', authenticateToken);
 app.use('/api/v1/analyses', authenticateToken);
 app.use('/api/v1/results', authenticateToken);
+app.use('/api/v1/harvesters', authenticateToken);
+app.use('/api/v1/workflows', authenticateToken);
+app.use('/api/v1/data-sources', authenticateToken);
+app.use('/api/v1/harvest-schedule', authenticateToken);
 
 // 404 + error handler
 app.use(notFound);
