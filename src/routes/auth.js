@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { query } from '../db.js';
 import { config } from '../config.js';
+import { sendPasswordResetEmail } from '../utils/email.js';
 
 const router = Router();
 
@@ -131,6 +132,7 @@ router.get('/me', async (req, res, next) => {
 
 /**
  * POST /api/v1/auth/reset-password
+ * Žádost o reset hesla - odešle e-mail s reset linkem
  */
 router.post('/reset-password', async (req, res, next) => {
   try {
@@ -140,24 +142,90 @@ router.post('/reset-password', async (req, res, next) => {
       return res.status(400).json({ error: 'Email je povinný' });
     }
 
-    const rows = await query('SELECT id FROM usr WHERE email = ?', [email]);
+    const rows = await query('SELECT id, email FROM usr WHERE email = ?', [email]);
     
     if (rows.length === 0) {
-      return res.status(404).json({ error: 'Uživatel s tímto e-mailem neexistuje' });
+      // Z bezpečnostních důvodů vždy vrátíme success, aby útočník nemohl zjistit, které emaily existují
+      return res.json({ message: 'Pokud e-mail existuje v systému, byly na něj odeslány pokyny pro obnovení hesla' });
     }
 
-    // Vygenerujeme reset token (pro jednoduchost použijeme JWT)
+    // Vygenerujeme reset token
     const resetToken = jwt.sign(
-      { userId: rows[0].id, type: 'reset' },
+      { userId: rows[0].id, type: 'reset', email: rows[0].email },
       config.jwtSecret,
       { expiresIn: '1h' }
     );
 
-    // V reálné aplikaci by se token uložil do DB a poslal email
-    // Pro demo účely jen vrátíme success
-    console.log(`Reset token pro ${email}: ${resetToken}`);
+    // Odešleme e-mail
+    const emailSent = await sendPasswordResetEmail(rows[0].email, resetToken);
     
-    res.json({ message: 'Pokyny pro obnovení hesla byly odeslány na váš e-mail' });
+    if (!emailSent) {
+      console.error(`Nepodařilo se odeslat reset e-mail na ${rows[0].email}`);
+      // I když se email nepodařilo odeslat, vrátíme success pro bezpečnost
+      // V produkci můžete logovat do DB nebo monitoring systému
+    }
+    
+    res.json({ message: 'Pokud e-mail existuje v systému, byly na něj odeslány pokyny pro obnovení hesla' });
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * POST /api/v1/auth/reset-password/confirm
+ * Potvrzení nového hesla s reset tokenem
+ */
+router.post('/reset-password/confirm', async (req, res, next) => {
+  try {
+    const { token, newPassword } = req.body ?? {};
+    
+    if (!token || !newPassword) {
+      return res.status(400).json({ error: 'Token a nové heslo jsou povinné' });
+    }
+
+    if (newPassword.length < 1) {
+      return res.status(400).json({ error: 'Heslo musí mít alespoň 1 znak' });
+    }
+
+    // Ověříme a dekódujeme token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, config.jwtSecret);
+      
+      if (decoded.type !== 'reset') {
+        return res.status(400).json({ error: 'Neplatný typ tokenu' });
+      }
+    } catch (jwtError) {
+      if (jwtError.name === 'TokenExpiredError') {
+        return res.status(400).json({ error: 'Platnost tokenu vypršela. Požádejte o nový reset hesla.' });
+      }
+      return res.status(400).json({ error: 'Neplatný token' });
+    }
+
+    // Najdeme uživatele
+    const rows = await query('SELECT id, email FROM usr WHERE id = ?', [decoded.userId]);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Uživatel nenalezen' });
+    }
+
+    // Dodatečná kontrola - email v tokenu musí odpovídat emailu v DB
+    if (decoded.email !== rows[0].email) {
+      return res.status(400).json({ error: 'Token neodpovídá uživateli' });
+    }
+
+    // Zahashujeme nové heslo
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+
+    // Aktualizujeme heslo
+    await query(
+      'UPDATE usr SET password_hash = ? WHERE id = ?',
+      [passwordHash, decoded.userId]
+    );
+
+    console.log(`Heslo bylo úspěšně změněno pro uživatele: ${rows[0].email}`);
+
+    res.json({ message: 'Heslo bylo úspěšně změněno. Nyní se můžete přihlásit s novým heslem.' });
   } catch (e) {
     next(e);
   }

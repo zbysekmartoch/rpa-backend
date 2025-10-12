@@ -10,7 +10,45 @@ Kompletní přehled všech API endpointů pro RPA Backend.
 | `/login` | POST | Přihlášení uživatele | ❌ | `{email, password}` | `{token, user}` |
 | `/register` | POST | Registrace nového uživatele | ❌ | `{firstName, lastName, email, password}` | `{message}` |
 | `/me` | GET | Informace o aktuálním uživateli | ✅ | - | `{id, firstName, lastName, email}` |
-| `/reset-password` | POST | Reset hesla | ❌ | `{email}` | `{message}` |
+| `/reset-password` | POST | Žádost o reset hesla (odešle e-mail) | ❌ | `{email}` | `{message}` |
+| `/reset-password/confirm` | POST | Potvrzení nového hesla s tokenem | ❌ | `{token, newPassword}` | `{message}` |
+
+**Reset hesla workflow:**
+
+1. **Žádost o reset:**
+   ```json
+   POST /api/v1/auth/reset-password
+   {
+     "email": "user@example.com"
+   }
+   ```
+   - Backend vygeneruje JWT token s 1h expirací
+   - Odešle e-mail s odkazem na frontend
+   - Vždy vrátí success (bezpečnostní opatření)
+
+2. **Potvrzení nového hesla:**
+   ```json
+   POST /api/v1/auth/reset-password/confirm
+   {
+     "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+     "newPassword": "NewSecurePassword123"
+   }
+   ```
+   - Backend ověří token
+   - Změní heslo v databázi
+   - Uživatel se může přihlásit s novým heslem
+
+**Email konfigurace:**
+
+Pro Gmail:
+- Použij App-Specific Password (vygeneruj v Google Account Security)
+- EMAIL_HOST=smtp.gmail.com
+- EMAIL_PORT=587
+- EMAIL_SECURE=false
+
+Pro jiné SMTP servery:
+- Nastav EMAIL_HOST, EMAIL_PORT podle poskytovatele
+- EMAIL_SECURE=true pro SSL/TLS (port 465)
 
 ## 📦 Produkty
 **Base URL:** `/api/v1/products`
@@ -43,6 +81,7 @@ Kompletní přehled všech API endpointů pro RPA Backend.
 
 | Endpoint | Method | Popis | Auth | Request Body | Response |
 |----------|--------|-------|------|--------------|----------|
+| `/config` | GET | Konfigurace analýz a podporované typy | ✅ | - | `{supportedScriptTypes, paths, logging}` |
 | `/` | GET | Seznam analýz | ✅ | - | `{items}` |
 | `/` | POST | Vytvoření analýzy | ✅ | `{name, settings}` | Nová analýza |
 | `/:id` | GET | Detail analýzy | ✅ | - | Analýza |
@@ -53,10 +92,28 @@ Kompletní přehled všech API endpointů pro RPA Backend.
 **Settings formát:**
 ```json
 {
-  "workflow": "script1.py\nscript2.py",
+  "workflow": "script1.py\nscript2.js\nanalysis.R",
   "parameters": {...}
 }
 ```
+
+**Konfigurace (config.json):**
+- Příkazy pro jednotlivé typy skriptů lze konfigurovat
+- Cesty k složkám scripts a results
+- Nastavení loggingu (názvy souborů, separátory, atd.)
+- Výchozí timeouty a limity
+
+**Podporované jazyky skriptů:**
+Konfigurováno v `config.json`, výchozí:
+- `.py` - Python skripty
+- `.js` - Node.js skripty  
+- `.r`, `.R` - R skripty
+
+**Logging:**
+- Výsledky analýz obsahují detailní logy: `analysis.log` a `analysis.err`
+- Každý krok workflow je zalogován s timestampem
+- Konfigurovatelné separátory a formáty
+- Automatické zachycení stdout a stderr jednotlivých skriptů
 
 ## 📁 Výsledky
 **Base URL:** `/api/v1/results`

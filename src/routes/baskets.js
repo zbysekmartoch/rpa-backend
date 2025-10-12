@@ -46,12 +46,17 @@ router.get('/:id/products', async (req, res, next) => {
 
     const rows = await query(
       `
-      SELECT p.id, p.name, p.brand, p.category
-      FROM bp
-      JOIN product p ON p.id = bp.product_id
-      WHERE bp.basket_id = ?
-      ORDER BY p.id
-      `
+    SELECT p.id, p.name, p.brand, p.category,
+    COUNT(DISTINCT pr.seller) as sellerCount,
+    COUNT(pr.id) as priceCount,
+    min(pr.date) minDate,
+    max(pr.date) maxDate
+    FROM bp
+    JOIN product p ON p.id = bp.product_id
+    LEFT JOIN price pr ON pr.product_id = p.id AND pr.invalid = 0
+    WHERE bp.basket_id = ?
+    GROUP BY p.id
+    ORDER BY p.id`
     , [id]);
 
     res.json({ items: rows });

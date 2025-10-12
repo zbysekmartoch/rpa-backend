@@ -9,12 +9,42 @@ import path from 'path';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import process from 'process'; // Add this import
+import process from 'process';
 
 // Získáme absolutní cestu k backend složce (2 úrovně nad current file)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const BACKEND_DIR = path.join(__dirname, '../..');
+
+// Načteme konfiguraci
+const configPath = path.join(BACKEND_DIR, 'config.json');
+let config;
+try {
+  const configData = await fs.readFile(configPath, 'utf8');
+  config = JSON.parse(configData);
+} catch (error) {
+  console.error('Failed to load config.json, using defaults:', error.message);
+  // Fallback konfigurace
+  config = {
+    paths: {
+      scripts: "scripts",
+      results: "results"
+    },
+    scriptCommands: {
+      ".py": { command: "python", description: "Python scripts" },
+      ".js": { command: "node", description: "Node.js scripts" },
+      ".r": { command: "Rscript", description: "R scripts" },
+      ".R": { command: "Rscript", description: "R scripts" }
+    },
+    logging: {
+      logFileName: "analysis.log",
+      errorFileName: "analysis.err",
+      timestampFormat: "ISO",
+      separatorChar: "=",
+      separatorLength: 80
+    }
+  };
+}
 
 
 const router = Router();
@@ -35,6 +65,26 @@ function toSettingsText(val) {
   if (typeof val === 'string') return val;      // očekáváme validní JSON string
   return JSON.stringify(val);
 }
+
+/**
+ * GET /api/v1/analyses/config
+ * Vrací konfiguraci analýz
+ */
+router.get('/config', async (req, res, next) => {
+  try {
+    res.json({
+      supportedScriptTypes: Object.keys(config.scriptCommands).map(ext => ({
+        extension: ext,
+        command: config.scriptCommands[ext].command,
+        description: config.scriptCommands[ext].description
+      })),
+      paths: config.paths,
+      logging: config.logging
+    });
+  } catch (e) {
+    next(e);
+  }
+});
 
 /**
  * GET /api/v1/analyses
@@ -235,16 +285,18 @@ router.post('/:id/run', async (req, res, next) => {
 
 
 async function runAnalysis(analysisId, settings) {
-  // Simulace dlouho běžící úlohy
+  let resultId = null;
+  try {
+    // Simulace dlouho běžící úlohy
     console.log('Running analysis with settings:', settings);
     const r = await query(
       'INSERT INTO result(analysis_id, status) VALUES (?, ?)',
       [analysisId,'pending']
     );
-    const resultId = r.insertId;
+    resultId = r.insertId;
 
-        // Vytvoříme složku pro výsledky
-    const resultDir = path.join(BACKEND_DIR, 'results', resultId.toString());
+    // Vytvoříme složku pro výsledky
+    const resultDir = path.join(BACKEND_DIR, config.paths.results, resultId.toString());
     await fs.mkdir(resultDir, { recursive: true });
 
     // Uložíme settings do data.json
@@ -253,30 +305,84 @@ async function runAnalysis(analysisId, settings) {
       JSON.stringify(settings, null, 2)
     );
 
-
+    // Vytvoříme log soubory
+    const logFile = path.join(resultDir, config.logging.logFileName);
+    const errorFile = path.join(resultDir, config.logging.errorFileName);
+    
+    // Inicializujeme log soubory s hlavičkou
+    const startTimestamp = new Date().toISOString();
+    const separator = config.logging.separatorChar.repeat(config.logging.separatorLength);
+    const analysisHeader = `Analysis Execution Log - Result ID: ${resultId}\nStarted: ${startTimestamp}\nAnalysis ID: ${analysisId}\n${separator}\n\n`;
+    
+    await fs.writeFile(logFile, analysisHeader);
+    await fs.writeFile(errorFile, analysisHeader);
 
     let workflow = settings?.workflow||'';
     let steps=workflow.split('\n').map(s=>s.trim()).filter(s=>s);
     if (steps.length) {
       for (const step of steps) {
         console.log(`Executing step: ${step} `);
-        const success = await runScript(step, resultDir);
+        const success = await runScript(step, resultDir, logFile, errorFile);
         
         if (!success) {
           await query(
             'UPDATE result SET status = ? WHERE id = ?',
             ['failed', resultId]
           );
+          
+          // Zapíšeme chybu do log souboru
+          const failTimestamp = new Date().toISOString();
+          const failSeparator = config.logging.separatorChar.repeat(config.logging.separatorLength);
+          const failMsg = `\n${failSeparator}\n[${failTimestamp}] ANALYSIS FAILED at step: ${step}\n${failSeparator}\n`;
+          await fs.appendFile(logFile, failMsg);
+          await fs.appendFile(errorFile, failMsg);
+          
           return;
         }
       }
     }
 
-
+    // Vše proběhlo úspěšně
     await query(
         'UPDATE result SET status = ? WHERE id = ?',
         ['completed', resultId]
       );
+      
+    // Zapíšeme úspěch do log souboru
+    const completedTimestamp = new Date().toISOString();
+    const successSeparator = config.logging.separatorChar.repeat(config.logging.separatorLength);
+    const successMsg = `\n${successSeparator}\n[${completedTimestamp}] ANALYSIS COMPLETED SUCCESSFULLY\nResult ID: ${resultId}\nTotal steps executed: ${steps.length}\n${successSeparator}\n`;
+    await fs.appendFile(logFile, successMsg);
+    await fs.appendFile(errorFile, successMsg);
+    
+  } catch (error) {
+    console.error('Analysis failed:', error);
+    
+    // Aktualizujeme status pouze pokud máme resultId
+    if (resultId) {
+      await query(
+        'UPDATE result SET status = ? WHERE id = ?',
+        ['failed', resultId]
+      );
+    }
+    
+    // Zapíšeme systémovou chybu do log souboru
+    if (resultId) {
+      const errorTimestamp = new Date().toISOString();
+      const errorSeparator = config.logging.separatorChar.repeat(config.logging.separatorLength);
+      const errorMsg = `\n${errorSeparator}\n[${errorTimestamp}] SYSTEM ERROR: ${error.message}\nStack: ${error.stack}\n${errorSeparator}\n`;
+      const resultDir = path.join(BACKEND_DIR, config.paths.results, resultId.toString());
+      const logFile = path.join(resultDir, config.logging.logFileName);
+      const errorFile = path.join(resultDir, config.logging.errorFileName);
+      
+      try {
+        await fs.appendFile(logFile, errorMsg);
+        await fs.appendFile(errorFile, errorMsg);
+      } catch (logError) {
+        console.error('Failed to write error to log files:', logError);
+      }
+    }
+  }
 }   
 
 
@@ -285,30 +391,37 @@ async function runAnalysis(analysisId, settings) {
  * Spustí externí skript a počká na jeho dokončení
  * @param {string} scriptPath - Relativní cesta ke skriptu od složky scripts
  * @param {string} workDir - Pracovní adresář pro skript
+ * @param {string} logFile - Cesta k log souboru
+ * @param {string} errorFile - Cesta k error souboru
  * @returns {Promise<boolean>} - true pokud skript uspěl, false pokud selhal
  */
-async function runScript(scriptPath, workDir) {
-  const fullScriptPath = path.join(BACKEND_DIR, 'scripts', scriptPath);
+async function runScript(scriptPath, workDir, logFile, errorFile) {
+  const fullScriptPath = path.join(BACKEND_DIR, config.paths.scripts, scriptPath);
   const ext = path.extname(scriptPath).toLowerCase();
   
-  let command, args;
-  switch (ext) {
-    case '.py':
-      command = 'python3';
-      args = [fullScriptPath, workDir];  // přidáme workDir jako argument
-      break;
-    case '.js':
-    case '.cjs':
-      command = 'node';
-      args = [fullScriptPath, workDir];  // přidáme workDir jako argument
-      break;
-    default:
-      console.error(`Unsupported script type: ${ext}`);
-      return false;
+  // Zkontrolujeme, zda máme konfiguraci pro danou příponu
+  const scriptConfig = config.scriptCommands[ext];
+  if (!scriptConfig) {
+    console.error(`Unsupported script type: ${ext}. Supported types: ${Object.keys(config.scriptCommands).join(', ')}`);
+    return false;
   }
   
+  const command = scriptConfig.command;
+  const args = [fullScriptPath, workDir];
+  
+  const timestamp = new Date().toISOString();
+  const separator = config.logging.separatorChar.repeat(config.logging.separatorLength);
+  
+  // Připravíme log záznamy
+  const logHeader = `\n${separator}\n[${timestamp}] Starting script: ${scriptPath}\nType: ${scriptConfig.description}\nCommand: ${command} ${args.join(' ')}\n${separator}\n`;
+  const errorHeader = `\n${separator}\n[${timestamp}] Starting script: ${scriptPath}\nType: ${scriptConfig.description}\nCommand: ${command} ${args.join(' ')}\n${separator}\n`;
+  
+  // Zapíšeme hlavičky do log souborů
+  await fs.appendFile(logFile, logHeader);
+  await fs.appendFile(errorFile, errorHeader);
+  
   return new Promise((resolve) => {
-    const childProcess = spawn(command, args, {  // renamed from 'process' to 'childProcess'
+    const childProcess = spawn(command, args, {
       cwd: workDir,
       env: {
         ...process.env,
@@ -316,20 +429,36 @@ async function runScript(scriptPath, workDir) {
       }
     });
 
-    childProcess.stdout.on('data', (data) => {
-      console.log(`Script output: ${data}`);
+    childProcess.stdout.on('data', async (data) => {
+      const output = data.toString();
+      console.log(`Script output: ${output}`);
+      // Zapíšeme do log souboru
+      await fs.appendFile(logFile, output);
     });
 
-    childProcess.stderr.on('data', (data) => {
-      console.error(`Script error: ${data}`);
+    childProcess.stderr.on('data', async (data) => {
+      const output = data.toString();
+      console.error(`Script error: ${output}`);
+      // Zapíšeme do error souboru
+      await fs.appendFile(errorFile, output);
     });
 
-    childProcess.on('error', (error) => {
-      console.error(`Failed to start script: ${error}`);
+    childProcess.on('error', async (error) => {
+      const errorMsg = `\nFailed to start script: ${error.message}\n`;
+      console.error(errorMsg);
+      await fs.appendFile(errorFile, errorMsg);
       resolve(false);
     });
 
-    childProcess.on('close', (code) => {
+    childProcess.on('close', async (code) => {
+      const finishTimestamp = new Date().toISOString();
+      const finishSeparator = config.logging.separatorChar.repeat(config.logging.separatorLength);
+      const finishMsg = `\n[${finishTimestamp}] Script finished with exit code: ${code}\n${finishSeparator}\n\n`;
+      
+      // Zapíšeme dokončení do obou souborů
+      await fs.appendFile(logFile, finishMsg);
+      await fs.appendFile(errorFile, finishMsg);
+      
       resolve(code === 0);
     });
   });

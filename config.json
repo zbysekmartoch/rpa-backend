@@ -1,0 +1,35 @@
+{
+  "paths": {
+    "scripts": "scripts",
+    "results": "results"
+  },
+  "scriptCommands": {
+    ".py": {
+      "command": "python3",
+      "description": "Python scripts"
+    },
+    ".js": {
+      "command": "node", 
+      "description": "Node.js scripts"
+    },
+    ".r": {
+      "command": "Rscript",
+      "description": "R scripts"
+    },
+    ".R": {
+      "command": "Rscript",
+      "description": "R scripts"
+    }
+  },
+  "logging": {
+    "logFileName": "analysis.log",
+    "errorFileName": "analysis.err",
+    "timestampFormat": "ISO",
+    "separatorChar": "=",
+    "separatorLength": 80
+  },
+  "analysis": {
+    "defaultTimeout": 300000,
+    "maxConcurrentAnalyses": 5
+  }
+}

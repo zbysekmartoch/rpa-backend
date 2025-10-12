@@ -49,6 +49,79 @@ mysql -u root -p your_database < schedule.sql
 npm start
 ```
 
+## ⚙️ Configuration
+
+The application uses `config.json` for settings:
+
+```json
+{
+  "paths": {
+    "scripts": "scripts",
+    "results": "results"
+  },
+  "scriptCommands": {
+    ".py": {
+      "command": "python3",
+      "description": "Python scripts"
+    },
+    ".js": {
+      "command": "node", 
+      "description": "Node.js scripts"
+    },
+    ".r": {
+      "command": "Rscript",
+      "description": "R scripts"
+    }
+  },
+  "logging": {
+    "logFileName": "analysis.log",
+    "errorFileName": "analysis.err",
+    "separatorChar": "=",
+    "separatorLength": 80
+  }
+}
+```
+
+### Adding New Script Types
+
+To add support for a new language (e.g., Julia):
+
+```json
+{
+  "scriptCommands": {
+    ".jl": {
+      "command": "julia",
+      "description": "Julia scripts"
+    }
+  }
+}
+```
+
+### Email Configuration for Password Reset
+
+Configure email settings in `.env`:
+
+```bash
+# Gmail example
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_SECURE=false
+EMAIL_USER=your-email@gmail.com
+EMAIL_PASSWORD=your-app-specific-password
+EMAIL_FROM=noreply@rpa-backend.com
+FRONTEND_URL=http://localhost:5173
+```
+
+**For Gmail:**
+1. Enable 2-Factor Authentication
+2. Generate App-Specific Password at: https://myaccount.google.com/apppasswords
+3. Use the generated password as `EMAIL_PASSWORD`
+
+**For other SMTP providers:**
+- Update `EMAIL_HOST` and `EMAIL_PORT` accordingly
+- Set `EMAIL_SECURE=true` for SSL/TLS (usually port 465)
+- Set `EMAIL_SECURE=false` for STARTTLS (usually port 587)
+
 ## Environment Variables
 
 ```bash

@@ -23,9 +23,6 @@ if (!workingDir) {
   console.error('Chyba: Nebyl předán pracovní adresář jako parametr');
   process.exit(1);
 }
-console.log({
-    host: DB_HOST, user: DB_USER, password: DB_PASSWORD, database: DB_NAME,
-  });
 // Globální objekt pro data
 let data = {};
 
