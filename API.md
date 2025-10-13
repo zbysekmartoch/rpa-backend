@@ -169,14 +169,34 @@ Konfigurováno v `config.json`, výchozí:
 | `/:id` | GET | Detail harvest jobu | ✅ | - | Schedule |
 | `/:id` | PUT | Aktualizace harvest jobu | ✅ | `{harvester_id?, datasource_id?, cron_expression?}` | Aktualizovaný schedule |
 | `/:id` | DELETE | Smazání harvest jobu | ✅ | - | `{success, id}` |
+| `/import/:id` | POST | Import dat z harvesteru do DB | ✅ | Query/Body params | `{message, scheduleId, status}` |
 
-**Query parametry:**
+**Query parametry (GET):**
 - `harvester_id` - filtr podle harvesteru
 - `datasource_id` - filtr podle datového zdroje
+
+**Import parametry (POST /import/:id):**
+- `from` - ISO 8601 datetime (např. `2025-10-01T00:00:00Z`) - filtr od data
+- `to` - ISO 8601 datetime (např. `2025-10-31T23:59:59Z`) - filtr do data
+- `screenshots` - boolean - zahrnout price screenshots (`*prices*.png|jpg`)
+- `images` - boolean - zahrnout product images (`product*.jpg|png`)
+
+**Příklad importu:**
+```bash
+POST /api/v1/harvest-schedule/import/123?from=2025-10-01T00:00:00Z&to=2025-10-31T23:59:59Z&images=true&screenshots=true
+```
+
+**Import workflow:**
+1. Backend stáhne ZIP z harvesteru: `GET {harvester_host}/export/{scheduleId}?params`
+2. ZIP se uloží do `./temp/harvest_{id}_{timestamp}.zip`
+3. Spustí se import script: `node scripts/import-data.js {zipFile}`
+4. Po dokončení se ZIP soubor smaže
+5. Import běží asynchronně - okamžitá response s `status: 'downloading'`
 
 **Automatická synchronizace:**
 - POST/PUT automaticky volá harvester API pro vytvoření/aktualizaci jobu
 - DELETE automaticky volá harvester API pro zrušení jobu
+- Import volá harvester export endpoint a zpracuje data
 
 ## 🔄 Workflows
 **Base URL:** `/api/v1/workflows`
