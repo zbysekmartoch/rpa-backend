@@ -26,26 +26,46 @@ REST API for managing products, baskets, analyses, harvesters, and harvest sched
 - **Authentication**: JWT, bcrypt
 - **Security**: Helmet, CORS, Rate limiting
 - **Database**: MySQL/MariaDB
+- **Python**: Analysis scripts with scikit-learn, matplotlib, numpy
 
 ## Installation
 
+### 1. Clone Repository
 ```bash
-# Clone repository
 git clone https://github.com/zbysekmartoch/rpa-backend.git
 cd rpa-backend
+```
 
-# Install dependencies
+### 2. Install Node.js Dependencies
+```bash
 npm install
+```
 
+### 3. Setup Python Environment
+```bash
+cd scripts/analyzy
+./setup-python-env.sh
+cd ../..
+```
+
+See [PYTHON_SETUP.md](PYTHON_SETUP.md) for detailed Python setup instructions.
+
+### 4. Configure Environment
+```bash
 # Set up environment variables
 cp .env.example .env
 # Edit .env with your configuration
+```
 
+### 5. Setup Database
+```bash
 # Create database tables
 mysql -u root -p your_database < harvester.sql
 mysql -u root -p your_database < schedule.sql
+```
 
-# Start server
+### 6. Start Server
+```bash
 npm start
 ```
 
