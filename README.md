@@ -30,6 +30,25 @@ REST API for managing products, baskets, analyses, harvesters, and harvest sched
 
 ## Installation
 
+### Quick Setup (Recommended)
+
+```bash
+# Clone repository
+git clone https://github.com/zbysekmartoch/rpa-backend.git
+cd rpa-backend
+
+# Run automated setup
+./setup.sh
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your configuration
+
+# Setup database (see below)
+```
+
+### Manual Setup
+
 ### 1. Clone Repository
 ```bash
 git clone https://github.com/zbysekmartoch/rpa-backend.git
@@ -50,21 +69,30 @@ cd ../..
 
 See [PYTHON_SETUP.md](PYTHON_SETUP.md) for detailed Python setup instructions.
 
-### 4. Configure Environment
+### 4. Setup Reporter Dependencies
+```bash
+cd scripts/reports
+npm install
+cd ../..
+```
+
+Reporter používá vlastní `package.json` pro generování Word dokumentů. Více v [scripts/reports/REPORTER.md](scripts/reports/REPORTER.md).
+
+### 5. Configure Environment
 ```bash
 # Set up environment variables
 cp .env.example .env
 # Edit .env with your configuration
 ```
 
-### 5. Setup Database
+### 6. Setup Database
 ```bash
 # Create database tables
 mysql -u root -p your_database < harvester.sql
 mysql -u root -p your_database < schedule.sql
 ```
 
-### 6. Start Server
+### 7. Start Server
 ```bash
 npm start
 ```

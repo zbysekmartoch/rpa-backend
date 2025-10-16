@@ -4,6 +4,34 @@
 
 Script `reporter.js` generuje Word dokumenty (.docx) ze šablon s dynamickými daty. Podporuje generování více dokumentů z různých šablon v jednom běhu.
 
+## Instalace
+
+### Node.js Dependencies
+
+Reporter má vlastní `package.json` s potřebnými knihovnami.
+
+```bash
+cd scripts/reports
+npm install
+```
+
+**Dependencies:**
+- `docxtemplater` (^3.65.3) - Šablonový engine pro DOCX
+- `docxtemplater-image-module-free` (^1.1.1) - Podpora pro obrázky
+- `pizzip` (^3.2.0) - ZIP/DOCX handling
+- `dotenv` (^17.2.1) - Environment variables
+- `mysql2` (^3.14.3) - MySQL database connector
+
+### Automatická Instalace
+
+Při prvním použití na serveru:
+
+```bash
+cd scripts/reports
+npm install
+cd ../..
+```
+
 ## Použití
 
 ```bash
@@ -532,13 +560,27 @@ reports/reporter.js
 
 ## Dependencies
 
+Reporter má vlastní `package.json` v `scripts/reports/`:
+
 ```json
 {
-  "pizzip": "^3.1.7",
-  "docxtemplater": "^3.50.0",
-  "docxtemplater-image-module-free": "^1.1.1",
-  "dotenv": "^16.4.7"
+  "name": "reporter",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "docxtemplater": "^3.65.3",
+    "docxtemplater-image-module-free": "^1.1.1",
+    "pizzip": "^3.2.0",
+    "dotenv": "^17.2.1",
+    "mysql2": "^3.14.3"
+  }
 }
+```
+
+**Instalace:**
+```bash
+cd scripts/reports
+npm install
 ```
 
 ## Changelog
