@@ -385,7 +385,9 @@ async function runAnalysis(analysisId, settings) {
   }
 }   
 
-
+function isBareCommand(p) {
+  return typeof p === "string" && !p.includes("/") && !p.includes("\\");
+}
 
 /**
  * Spustí externí skript a počká na jeho dokončení
@@ -405,8 +407,13 @@ async function runScript(scriptPath, workDir, logFile, errorFile) {
     console.error(`Unsupported script type: ${ext}. Supported types: ${Object.keys(config.scriptCommands).join(', ')}`);
     return false;
   }
-  
-  const command = scriptConfig.command;
+
+  let command;
+  if (isBareCommand(scriptConfig.command)) {
+    command = scriptConfig.command;
+  } else {
+    command = path.isAbsolute(scriptConfig.command) ? scriptConfig.command : path.resolve(BACKEND_DIR, scriptConfig.command);
+  }
   const args = [fullScriptPath, workDir];
   
   const timestamp = new Date().toISOString();

@@ -46,7 +46,7 @@ router.get('/:id/products', async (req, res, next) => {
 
     const rows = await query(
       `
-    SELECT p.id, p.name, p.brand, p.category,
+    SELECT p.id, p.name, p.brand, p.category,p.url,
     COUNT(DISTINCT pr.seller) as sellerCount,
     COUNT(pr.id) as priceCount,
     min(pr.date) minDate,

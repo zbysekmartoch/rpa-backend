@@ -1,19 +1,119 @@
--- Example post-import SQL queries
--- This file contains SQL commands that will be executed after the import is complete
--- Separate multiple queries with semicolons
 
--- Example: Update statistics or create aggregated views
--- UPDATE imp_product SET processed = 1 WHERE processed IS NULL;
+insert ignore into price(price_src, price, seller, seller_src, product_id, date)
+select price price_src,CAST(
+        REPLACE(
+            REGEXP_REPLACE(price, '[^0-9.,]', ''),
+            ',',
+            '.'
+        )
+    AS FLOAT) AS price,
+IF(
+    LEFT(seller, 5) = 'Logo ',
+    SUBSTRING(seller, 6),
+    seller
+  ) AS seller,
+seller seller_src, productid product_id, date date from imp_price
+;
 
--- Example: Create indexes for better performance
--- CREATE INDEX IF NOT EXISTS idx_product_date ON imp_product(date);
--- CREATE INDEX IF NOT EXISTS idx_price_date ON imp_price(date);
 
--- Example: Clean up duplicate entries
--- DELETE t1 FROM imp_product t1
--- INNER JOIN imp_product t2
--- WHERE t1.id > t2.id
--- AND t1.id = t2.id
--- AND t1.date = t2.date;
+replace into product(id, name, brand, category, url, src)
+WITH newest AS (
+  SELECT p1.*
+  FROM imp_product p1
+  JOIN (
+    SELECT id, MAX(date) AS max_date
+    FROM imp_product
+    GROUP BY id
+  ) p2 ON p1.id = p2.id AND p1.date = p2.max_date
+)
+SELECT
+  n.id,
+  COALESCE(n.name, MAX(IF(p.name <> '', p.name, NULL))) AS name,
+  COALESCE(n.brand, MAX(IF(p.brand <> '', p.brand, NULL))) AS brand,
+  COALESCE(n.category, MAX(IF(p.category <> '', p.category, NULL))) AS category,
+  COALESCE(n.url, MAX(IF(p.url <> '', p.url, NULL))) AS url,
+  'heureka' src
+FROM newest n
+LEFT JOIN imp_product p ON p.id = n.id
+GROUP BY n.id;
 
--- Add your custom post-import queries here
+
+
+update price set invalid=1 where price<=0
+;
+
+drop table if exists price_stat;
+create table price_stat as
+SELECT
+  t.product_id,
+  t.date,
+  MIN(t.price)                   AS min_price,
+  MAX(t.price)                   AS max_price,
+  AVG(t.price)                   AS avg_price,
+  COUNT(DISTINCT t.seller)       AS seller_count,
+  (
+    -- modus: bereme tu cenu, která se v rámci daného produktu a data vyskytuje nejčastěji
+    SELECT p2.price
+    FROM price AS p2
+    WHERE p2.product_id = t.product_id
+      AND p2.date       = t.date
+      AND p2.invalid    = 0
+    GROUP BY p2.price
+    ORDER BY COUNT(*),p2.price DESC
+    LIMIT 1
+  )                               AS mode_price
+FROM price AS t
+WHERE t.invalid = 0
+GROUP BY
+  t.product_id,
+  t.date
+ORDER BY
+  t.product_id,
+  t.date;
+
+alter table price_stat add index(product_id);
+alter table price_stat add index(date);
+
+alter table price_stat add index(date,product_id);
+
+drop table if exists price_stat_i1;
+create table price_stat_i1 as
+select price_stat.*
+,sum(price<mode_price)/seller_count under_mode
+,sum(price>mode_price)/seller_count over_mode
+,sum(price=mode_price)/seller_count on_par
+from price_stat
+join price on price.date=price_stat.date and price.product_id=price_stat.product_id
+group by price_stat.date,price_stat.product_id
+
+;
+
+alter table price_stat_i1 add index(product_id);
+alter table price_stat_i1 add index(date);
+
+alter table price_stat_i1 add column `ib` float DEFAULT NULL;
+alter table price_stat_i1 add column `dib` float DEFAULT NULL;
+alter table price_stat_i1 add column `id` int AUTO_INCREMENT primary key;
+
+update price_stat_i1
+set ib=sqrt((on_par*on_par+(min_price/mode_price)*(min_price/mode_price))/2)
+#where mode_price>0
+;
+
+WITH ranked AS (
+  SELECT
+    id,                       -- primární klíč řádku (pokud máš jiný než id, nahraď)
+    product_id,
+    date,
+    ib,
+    LAG(ib) OVER (PARTITION BY product_id ORDER BY date) AS ib_prev
+  FROM price_stat_i1
+)
+UPDATE price_stat_i1 p
+JOIN ranked r ON p.id = r.id
+SET p.dib = CASE
+              WHEN r.ib_prev IS NULL OR r.ib_prev = 0 THEN NULL
+              ELSE r.ib / r.ib_prev
+            END;
+
+

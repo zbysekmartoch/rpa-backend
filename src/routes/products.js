@@ -38,6 +38,7 @@ r.get('/', async (req, res, next) => {
         p.name, 
         p.brand, 
         p.category,
+        p.url,
         COUNT(DISTINCT pr.seller) as sellerCount,
         COUNT(pr.id) as priceCount,
         min(pr.date) minDate,

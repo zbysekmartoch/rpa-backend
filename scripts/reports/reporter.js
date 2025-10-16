@@ -88,7 +88,9 @@ function buildImageModule(allProducts) {
                 imgPath = path.join(`${PRODUCT_IMG_DIR}/product_${tagValue}`);
             }
             // Pokud je tagValue přímo buffer nebo cesta k souboru, použij to
-   
+            if (tagValue=='ABSOLUTE') {
+                imgPath = path.join(`${IMAGES_DIR}/${subFolderName}`);
+            }
 
             if (fs.existsSync(imgPath + '.png')) {
                 return fs.readFileSync(imgPath + '.png');
@@ -109,6 +111,8 @@ function buildImageModule(allProducts) {
         getSize: function (img, tagValue, tagName) {
             // Šířka × výška v px; Word si to přepočítá. Uprav dle potřeby (např. 1100×650).
             if (tagName == 'img_product') return [189, 189]
+             if (tagValue == 'ABSOLUTE') return [500, 375]
+            return [500, 625];
             return [500, 400];
             return [600, 480];
             return [640, 512];
@@ -121,6 +125,48 @@ function ISO2CZ(date) {
     const [year, month, day] = date.split('-');
     const formatted = `${parseInt(day)}.${parseInt(month)}.${year}`;
     return formatted;
+}
+
+/**
+ * Přidá img_xxx atributy do reportData pro všechny obrázky v IMAGES_DIR
+ * @param {Object} reportData - Objekt s daty reportu
+ * @returns {Object} reportData obohacený o img_xxx atributy
+ */
+function addImgTags(reportData) {
+    if (!fs.existsSync(IMAGES_DIR)) {
+        console.log(`Adresář ${IMAGES_DIR} neexistuje, přeskakuji přidávání img tagů`);
+        return reportData;
+    }
+
+    try {
+        // Načti všechny soubory přímo v IMAGES_DIR (ne rekurzivně)
+        const files = fs.readdirSync(IMAGES_DIR, { withFileTypes: true });
+        
+        // Filtruj pouze PNG a JPG soubory (ne složky)
+        const imageFiles = files.filter(file => 
+            file.isFile() && 
+            (file.name.toLowerCase().endsWith('.png') || file.name.toLowerCase().endsWith('.jpg'))
+        );
+
+        console.log(`Nalezeno ${imageFiles.length} obrázků v ${IMAGES_DIR}`);
+
+        // Přidej img_xxx atributy
+        imageFiles.forEach(file => {
+            // Získej název souboru bez přípony
+            const nameWithoutExt = path.parse(file.name).name;
+            const attrName = `img_${nameWithoutExt}`;
+            
+            // Přidej atribut s hodnotou "ABSOLUTE"
+            reportData[attrName] = 'ABSOLUTE';
+            
+            console.log(`  + ${attrName} = "ABSOLUTE"`);
+        });
+
+        return reportData;
+    } catch (error) {
+        console.error(`Chyba při přidávání img tagů: ${error.message}`);
+        return reportData;
+    }
 }
 
 async function main() {
@@ -149,34 +195,70 @@ async function main() {
  //   reportData = { ...reportData, ...data }
     reportData.dateFromDMY=ISO2CZ(reportData.dateFrom);
     reportData.dateToDMY=ISO2CZ(reportData.dateTo);
-   /* reportData.generatedAt = new Date().toLocaleString('cs-CZ', { dateStyle: 'long', timeStyle: 'short' });
-    reportData.productsCount = reportData.products.length;*/
-    // 3) Načti šablonu
-    const templatePath = path.join(__dirname, 'template.docx');
-    const content = fs.readFileSync(templatePath, 'binary');
+    reportData.processedAtDMY=ISO2CZ(reportData.processedAt);
+   
+    addImgTags(reportData);
 
-    const zip = new PizZip(content);
-    const imageModule = buildImageModule(data.products);
-    const doc = new Docxtemplater(zip, {
-        modules: [imageModule],   // klidně vynech, když teď neřešíš obrázky
-        paragraphLoop: true,
-        linebreaks: true,
-        delimiters: { start: '[[', end: ']]' }, // <— DŮLEŽITÉ
-    });
-
-    // 4) Renderuj s daty
-    try {
-        doc.render(reportData);
-    } catch (error) {
-        console.error('Chyba při renderu:', error);
-        throw error;
+    // 3) Zpracuj konfigurace dokumentů
+    let docConfigs = [];
+    
+    // Kontrola zda existuje report.doc v datech
+    if (reportData.report && reportData.report.doc && Array.isArray(reportData.report.doc)) {
+        docConfigs = reportData.report.doc;
+        console.log(`Nalezeno ${docConfigs.length} konfigurací dokumentů v data.json`);
+    } else {
+        // Fallback na výchozí konfiguraci pro zpětnou kompatibilitu
+        console.log('Konfigurace report.doc nenalezena, použiji výchozí template.docx');
+        docConfigs = [{
+            template: 'template.docx',
+            renderTo: 'report.docx'
+        }];
     }
 
-    // 5) Ulož
-    const buf = doc.getZip().generate({ type: 'nodebuffer' });
-    const outPath = path.join(workingDir, 'report.docx');
-    fs.writeFileSync(outPath, buf);
-    console.log(`Hotovo: ${outPath}`);
+    // 4) Zpracuj každý dokument
+    for (const docConfig of docConfigs) {
+        const templateName = docConfig.template;
+        const outputName = docConfig.renderTo;
+        
+        console.log(`\nZpracovávám dokument: ${templateName} -> ${outputName}`);
+        
+        try {
+            // Načti šablonu
+            const templatePath = path.join(__dirname, templateName);
+            
+            if (!fs.existsSync(templatePath)) {
+                console.error(`Chyba: Šablona ${templateName} nebyla nalezena v ${__dirname}`);
+                continue; // Pokračuj dalším dokumentem
+            }
+            
+            const content = fs.readFileSync(templatePath, 'binary');
+            const zip = new PizZip(content);
+            const imageModule = buildImageModule(data.products);
+            
+            const doc = new Docxtemplater(zip, {
+                modules: [imageModule],
+                paragraphLoop: true,
+                linebreaks: true,
+                delimiters: { start: '[[', end: ']]' },
+            });
+
+            // Renderuj s daty
+            doc.render(reportData);
+
+            // Ulož dokument
+            const buf = doc.getZip().generate({ type: 'nodebuffer' });
+            const outPath = path.join(workingDir, outputName);
+            fs.writeFileSync(outPath, buf);
+            
+            console.log(`✓ Dokument vytvořen: ${outPath}`);
+            
+        } catch (error) {
+            console.error(`✗ Chyba při zpracování dokumentu ${templateName}:`, error.message);
+            // Pokračuj dalším dokumentem místo ukončení celého scriptu
+        }
+    }
+    
+    console.log(`\n=== Generování dokumentů dokončeno ===`);
 }
 
 

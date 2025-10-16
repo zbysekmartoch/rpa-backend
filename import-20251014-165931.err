@@ -1,0 +1,27 @@
+[2025-10-14T17:00:22.152Z] Query 10 failed: create table price_stat_i1 as
+select price_stat.*
+,sum(price<mode_price)/seller_count under_mode
+,su...: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'alter table price_stat_i1 add index(product_id)' at line 12
+Error: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'alter table price_stat_i1 add index(product_id)' at line 12
+    at PromiseConnection.execute (/home/u1/projects/uohs/rpa/backend/node_modules/mysql2/lib/promise/connection.js:47:22)
+    at DataImporter.executeAfterImportSQL (/home/u1/projects/uohs/rpa/backend/import-data.cjs:275:33)
+    at async DataImporter.run (/home/u1/projects/uohs/rpa/backend/import-data.cjs:312:7)
+    at async main (/home/u1/projects/uohs/rpa/backend/import-data.cjs:351:5)
+[2025-10-14T17:00:22.155Z] Failed to execute after-import.sql: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'alter table price_stat_i1 add index(product_id)' at line 12
+Error: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'alter table price_stat_i1 add index(product_id)' at line 12
+    at PromiseConnection.execute (/home/u1/projects/uohs/rpa/backend/node_modules/mysql2/lib/promise/connection.js:47:22)
+    at DataImporter.executeAfterImportSQL (/home/u1/projects/uohs/rpa/backend/import-data.cjs:275:33)
+    at async DataImporter.run (/home/u1/projects/uohs/rpa/backend/import-data.cjs:312:7)
+    at async main (/home/u1/projects/uohs/rpa/backend/import-data.cjs:351:5)
+[2025-10-14T17:00:22.157Z] Import process failed: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'alter table price_stat_i1 add index(product_id)' at line 12
+Error: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'alter table price_stat_i1 add index(product_id)' at line 12
+    at PromiseConnection.execute (/home/u1/projects/uohs/rpa/backend/node_modules/mysql2/lib/promise/connection.js:47:22)
+    at DataImporter.executeAfterImportSQL (/home/u1/projects/uohs/rpa/backend/import-data.cjs:275:33)
+    at async DataImporter.run (/home/u1/projects/uohs/rpa/backend/import-data.cjs:312:7)
+    at async main (/home/u1/projects/uohs/rpa/backend/import-data.cjs:351:5)
+[2025-10-14T17:00:22.274Z] Fatal error: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'alter table price_stat_i1 add index(product_id)' at line 12
+Error: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near 'alter table price_stat_i1 add index(product_id)' at line 12
+    at PromiseConnection.execute (/home/u1/projects/uohs/rpa/backend/node_modules/mysql2/lib/promise/connection.js:47:22)
+    at DataImporter.executeAfterImportSQL (/home/u1/projects/uohs/rpa/backend/import-data.cjs:275:33)
+    at async DataImporter.run (/home/u1/projects/uohs/rpa/backend/import-data.cjs:312:7)
+    at async main (/home/u1/projects/uohs/rpa/backend/import-data.cjs:351:5)

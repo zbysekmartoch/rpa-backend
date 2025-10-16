@@ -53,7 +53,7 @@ def main():
     
     # Vyžadujeme povinný parametr work_dir
     if len(sys.argv) != 2:
-        print("Chybí parametr <work_dir>")
+        print("Použití: python prepare_stats.py <work_dir>")
         sys.exit(1)
     
     work_dir = sys.argv[1]
@@ -221,27 +221,7 @@ def main():
             , a_desc3.determ
             FROM a_desc1
             JOIN a_desc2 ON a_desc1.id=a_desc2.id
-            JOIN a_desc3 ON a_desc1.id=a_desc3.id""",
-        """DROP TABLE IF EXISTS b_desc""",
-        f"""          
-            CREATE TABLE b_desc AS
-            select a.date,a.brand,count(distinct a.product_id) Nprod, a.wiB/sum(a.seller_count) iB,
-            sum(a.seller_count) Nprice
-            from (
-            SELECT
-            s.date,
-            sqrt((s.on_par*s.on_par+(min_price/mode_price)*(min_price/mode_price))/2) iB
-            , s.product_id, p2.brand,
-            s.seller_count,
-            sqrt((s.on_par*s.on_par+(min_price/mode_price)*(min_price/mode_price))/2)*s.seller_count wiB
-            FROM bp b
-            JOIN price_stat_i1 s
-            ON s.product_id = b.product_id
-            LEFT JOIN product p2
-            ON p2.id = b.product_id
-            WHERE b.basket_id = {data['basketId']}
-            ) a
-            group by a.date, a.brand"""                 
+            JOIN a_desc3 ON a_desc1.id=a_desc3.id"""     
     ]
 
 

@@ -12,7 +12,7 @@ DB_CONFIG = {
     #"database": "pricedb",
     "database": "localpricedb",
     "charset": "utf8mb4",
-    "autocommit": True,
+    "autocommit": True
 }
 
 def get_connection():

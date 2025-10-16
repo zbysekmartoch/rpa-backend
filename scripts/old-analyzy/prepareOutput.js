@@ -43,6 +43,7 @@ async function fetchProducts() {
         host: DB_HOST, user: DB_USER, password: DB_PASSWORD, database: DB_NAME,
     });
 
+    // Uprav si SELECT tak, aby obsahoval všechny sloupce, které chceš v souhrnné tabulce + „hezké“ názvy
     const [rows] = await conn.execute(`
 
     select *
@@ -55,35 +56,6 @@ async function fetchProducts() {
 }
 
 
-
-async function fetchBrands() {
-    const conn = await mysql.createConnection({
-        host: DB_HOST, user: DB_USER, password: DB_PASSWORD, database: DB_NAME,
-    });
-
-    const [rows] = await conn.execute(`
-        SELECT 
-            brand,
-            MAX(Nprod) AS Nprod, 
-            SUM(Nprice) AS Nprice, 
-            SUM(wiB)/SUM(Nprice) AS iB 
-        FROM (
-            SELECT 
-                date, 
-                brand, 
-                Nprod,
-                Nprice, 
-                iB,
-                iB*Nprice AS wiB 
-            FROM b_desc
-        ) a
-        GROUP BY brand
-        ORDER BY brand
-    `);
-    
-    await conn.end();
-    return rows;
-}
 
 async function fetchAdditionalData() {
     
@@ -117,9 +89,6 @@ async function processData() {
     
     // Načti produkty z databáze
     data.products = await fetchProducts();
-    
-    // Načti brandy z databáze
-    data.brands = await fetchBrands();
     
     // Načti dodatečná data
     data.stat = await fetchAdditionalData();

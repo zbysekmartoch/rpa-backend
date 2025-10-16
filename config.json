@@ -5,10 +5,14 @@
   },
   "scriptCommands": {
     ".py": {
-      "command": "python3",
+      "command": "./scripts/analyzy/.venv/bin/python",
       "description": "Python scripts"
     },
     ".js": {
+      "command": "node", 
+      "description": "Node.js scripts"
+    },
+    ".cjs": {
       "command": "node", 
       "description": "Node.js scripts"
     },

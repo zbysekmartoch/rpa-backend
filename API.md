@@ -198,7 +198,56 @@ POST /api/v1/harvest-schedule/import/123?from=2025-10-01T00:00:00Z&to=2025-10-31
 - DELETE automaticky volá harvester API pro zrušení jobu
 - Import volá harvester export endpoint a zpracuje data
 
-## 🔄 Workflows
+## � Harvest (Manual Import)
+**Base URL:** `/api/v1/harvest`
+
+| Endpoint | Method | Popis | Auth | Request Body | Response |
+|----------|--------|-------|------|--------------|----------|
+| `/manual-import` | POST | Manuální import dat ze ZIP souboru | ✅ | multipart/form-data | `{message, filename, filesize, status}` |
+
+**Request:**
+- Content-Type: `multipart/form-data`
+- Body: FormData s polem `file` obsahujícím ZIP soubor
+- Max velikost: 500 MB
+
+**Příklad použití:**
+```bash
+# cURL
+curl -X POST http://localhost:3000/api/v1/harvest/manual-import \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -F "file=@/path/to/data.zip"
+
+# JavaScript fetch
+const formData = new FormData();
+formData.append('file', zipFile);
+
+const response = await fetch('/api/v1/harvest/manual-import', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`
+  },
+  body: formData
+});
+```
+
+**Response:**
+```json
+{
+  "message": "Import started",
+  "filename": "manual_1697123456789_data.zip",
+  "filesize": 15234567,
+  "status": "processing"
+}
+```
+
+**Import workflow:**
+1. ZIP soubor se nahraje do `./temp/manual_{timestamp}_{filename}.zip`
+2. Spustí se import script: `node scripts/import-data.js {zipFile}`
+3. Import běží asynchronně - okamžitá response s `status: 'processing'`
+4. Po dokončení se ZIP soubor smaže
+5. Výsledky se logují do konzole
+
+## �🔄 Workflows
 **Base URL:** `/api/v1/workflows`
 
 | Endpoint | Method | Popis | Auth | Response |
@@ -222,7 +271,37 @@ POST /api/v1/harvest-schedule/import/123?from=2025-10-01T00:00:00Z&to=2025-10-31
 
 | Endpoint | Method | Popis | Auth | Response |
 |----------|--------|-------|------|----------|
-| `/health` | GET | Health check | ❌ | `{ok: true}` |
+| `/health` | GET | Health check s detaily systému | ❌ | Detailní informace |
+
+**Health Check Response:**
+```json
+{
+  "ok": true,
+  "service": "rpa-backend",
+  "version": "1.0.0",
+  "build": "1.0.0",
+  "server": {
+    "host": "msi",
+    "port": 3000,
+    "nodeVersion": "v20.11.0",
+    "platform": "linux",
+    "uptime": 1234.56
+  },
+  "database": {
+    "host": "81.2.236.167",
+    "port": 3306,
+    "name": "pricedb",
+    "user": "oheroot"
+  },
+  "timestamp": "2025-10-14T12:34:56.789Z"
+}
+```
+
+**Použití:**
+- Monitoring dostupnosti služby
+- Diagnostika systému
+- CI/CD health checks
+- Zobrazení verzí a konfigurace
 
 ---
 

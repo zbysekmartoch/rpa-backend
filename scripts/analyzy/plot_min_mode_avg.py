@@ -6,9 +6,14 @@ import re
 import sys
 import pandas as pd
 import matplotlib.pyplot as plt
-from dbsettings import get_connection, load_data_json  # centrální DB nastavení
+from uohs_dbsettings import get_connection, load_data_json  # centrální DB nastavení
+import matplotlib.dates as mdates
+import matplotlib.ticker as mticker
+from PIL import Image
+from IPython.display import display
 
 # ====== KONFIGURACE ======
+plt.figure(figsize=(3.15, 3.94))
 
 # Globální objekt pro data z JSON
 data = {}
@@ -17,6 +22,12 @@ data = {}
 def sanitize_filename(s: str) -> str:
     s = re.sub(r"[\\/:*?\"<>|]+", " ", s)
     return re.sub(r"\s+", " ", s).strip()
+
+def truncate_product_name(name: str, max_length: int = 35) -> str:
+    """Zkrátí název produktu na max_length znaků, přidá '...' pokud je delší."""
+    if len(name) <= max_length:
+        return name
+    return name[:max_length] + "..."
 
 # ====== SQL ======
 BASE_SQL = """
@@ -65,44 +76,98 @@ def fetch_dataframe():
 
 def plot_for_each_product(df: pd.DataFrame, output_dir: str):
     os.makedirs(output_dir, exist_ok=True)
-    for (product_id, product_name), grp in df.groupby(["product_id","product_name"], dropna=False):
+
+    for (product_id, product_name), grp in df.groupby(["product_id", "product_name"], dropna=False):
         if grp.empty:
             continue
 
-        x = grp["date"]
+        x = pd.to_datetime(grp["date"])
         y_min  = grp["min_price"]
         y_mode = grp["mode_price"]
         y_avg  = grp["avg_price"]
 
-        plt.figure()
-        plt.plot(x, y_min,  label="min_price")
-        plt.plot(x, y_mode, label="mode_price")
-        plt.plot(x, y_avg,  label="avg_price")
-        title = f"{product_name} — min/mode/avg price ({data['dateFrom']} až {data['dateTo']})"
-        plt.title(title)
-        plt.xlabel("Datum")
-        plt.ylabel("Cena")
-        plt.legend()
-        plt.grid(True, linestyle=":", linewidth=0.5)
-        plt.xticks(rotation=90)  # otočení datumů
-        plt.tight_layout()
+        n = len(grp)
 
+        # Create figure with size
+        fig, ax = plt.subplots(figsize=(8/2.54, 10/2.54), constrained_layout=False)
+        fig.subplots_adjust(left=0.2, right=0.9, bottom=0.05, top=0.9)
+        fig.subplots_adjust(bottom=0.2)
+        ax.set_aspect('auto')
+
+
+        # Grid behind chart
+        ax = plt.gca()
+        ax.set_axisbelow(True)
+        plt.grid(True, linestyle=":", linewidth=0.5, zorder=1)
+        
+        # Keep only left and bottom spines
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["left"].set_visible(True)
+        ax.spines["bottom"].set_visible(True)
+
+        # Plot with colors
+        ax.plot(x, y_min, label="min_price",  color="#009022")
+        ax.plot(x, y_mode, label="mode_price", color="#D70C0F")
+        ax.plot(x, y_avg, label="avg_price",  color="#00469B")
+
+        ax.grid(True, linestyle=":", linewidth=0.5)
+        
+        ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"{int(x):,}".replace(",", " ")))
+
+        # Auto ticks and formatting for adaptive date ranges
+        locator = mdates.AutoDateLocator()
+        formatter = mdates.AutoDateFormatter(locator)
+        ax.xaxis.set_major_locator(locator)
+        ax.xaxis.set_major_formatter(formatter)
+        plt.setp(ax.get_xticklabels(), rotation=45, ha='right', va='top', fontsize=6.5)
+        plt.setp(ax.get_yticklabels(), fontsize=6.5)
+
+        # Move axes slightly up to free space below x-axis
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0 + 0.08, box.width, box.height - 0.08])
+
+        # Legend below x-axis label
+        ax.legend(
+            loc='upper center',
+            bbox_to_anchor=(0.5, -0.2),
+            ncol=3,
+            frameon=False,
+            fontsize=6.5
+        )
+
+        # Caption below legend
+        ax.text(
+            0.5, -0.3,
+            f"{truncate_product_name(product_name)}\nN = {n}, {data['dateFrom']} - {data['dateTo']}",
+            ha='center',
+            va='top',
+            fontsize=6.5,
+            transform=ax.transAxes
+        )
+
+        # Save figure
         fname = f"{sanitize_filename(str(product_id))}.png"
         out_path = os.path.join(output_dir, fname)
-        plt.savefig(out_path, dpi=150)
-        plt.close()
+        fig.savefig(out_path, dpi=300, bbox_inches=None, pad_inches=0)
+        #plt.show()
+        plt.close(fig)
         print(f"Uloženo: {out_path}")
+        img = Image.open(out_path)
+        display(img)
 
 def main():
     global data
     
     # Vyžadujeme povinný parametr work_dir
     if len(sys.argv) != 2:
-        print("Použití: python plot_min_mode_avg.py <work_dir>")
+        print("Chybí parametr <work_dir>")
         sys.exit(1)
     
     work_dir = sys.argv[1]
+
     json_path = os.path.join(work_dir, "data.json")
+    print(f"Looking for JSON at: {json_path}")
     
     # data.json musí existovat
     if not os.path.exists(json_path):

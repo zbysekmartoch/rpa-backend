@@ -19,16 +19,14 @@ import mysql.connector
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from uohs_dbsettings import get_connection, load_data_json  # <--- tady
-from matplotlib.ticker import MaxNLocator, FuncFormatter
-import numpy as np
-from PIL import Image
-from IPython.display import display
+from dbsettings import get_connection, load_data_json  # <--- tady
 
 # ======= KONFIGURACE =======
 
 # Globální objekt pro data z JSON
 data = {}
+
+
 
 HIST_BINS = 30        # počet intervalů (sloupců) "auto"
 
@@ -38,18 +36,11 @@ ROUND_TO_CENTS = True
 # Výstupní složka (automaticky zahrne období a košík)
 #OUTPUT_DIR = "img/histogram"
 
-plt.figure(figsize=(3.15, 3.94))
 
 # ======= POMOCNÉ =======
 def sanitize_filename(s: str) -> str:
     s = re.sub(r"[\\/:*?\"<>|]+", " ", s)
     return re.sub(r"\s+", " ", s).strip()
-
-def truncate_product_name(name: str, max_length: int = 35) -> str:
-    """Zkrátí název produktu na max_length znaků, přidá '...' pokud je delší."""
-    if len(name) <= max_length:
-        return name
-    return name[:max_length] + "..."
 
 def round2(x) -> float:
     try:
@@ -95,6 +86,7 @@ def fetch_dataframe():
         df["price"] = df["price"].map(round2)
     return df
 
+
 def save_histograms(df: pd.DataFrame):
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -103,83 +95,69 @@ def save_histograms(df: pd.DataFrame):
         if not prices:
             continue
 
+        # Statistika do titulku
         n = len(prices)
+        avg = sum(prices) / n if n else None
+        try:
+            med = median(prices)
+        except Exception:
+            med = None
 
-        # Create figure with size
-        fig, ax = plt.subplots(figsize=(8/2.54, 10/2.54), constrained_layout=False)
-        fig.subplots_adjust(left=0.2, right=0.9, bottom=0.05, top=0.9)
-        ax.set_aspect('auto')
-        fig.subplots_adjust(bottom=0.2)
-        
-        
-        plt.hist(prices, bins=data['histBins'],  color="#00469B")
+        mode_val = mode_count = None
+        if n:
+            c = Counter(prices)
+            max_c = max(c.values())
+            # při shodě zvolíme nižší cenu
+            mode_val = min([v for v, cnt in c.items() if cnt == max_c])
+            mode_count = max_c
 
-        # Grid behind chart
-        ax = plt.gca()
-        ax.set_axisbelow(True)
-        plt.grid(True, linestyle=":", linewidth=0.5, zorder=1)
-        
-        # Keep only left and bottom spines
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        ax.spines["left"].set_visible(True)
-        ax.spines["bottom"].set_visible(True)
-        
-        formatter = FuncFormatter(lambda x, _: f"{int(x):,}".replace(",", " "))
-        plt.gca().xaxis.set_major_formatter(formatter)
-
-        # Custom caption below chart
-        caption = f"{truncate_product_name(product_name)}\nN = {n}, {data['dateFrom']} - {data['dateTo']}"
-        plt.figtext(0.5,  0.03, caption, ha="center", fontsize=6.5)
-
-        ax = plt.gca()
-        
-        # Check if all data points are the same
-        unique_vals = np.unique(prices)
-        if len(unique_vals) == 1:
-            ax.set_xticks(unique_vals)  # single tick
-        else:
-            ax.xaxis.set_major_locator(MaxNLocator(nbins=6))
-        
-        # Format numbers with space as thousands separator
-        ax.xaxis.set_major_formatter(FuncFormatter(lambda x, _: f"{int(x):,}".replace(",", " ")))
-        
-        # Rotate labels
-        plt.setp(ax.get_xticklabels(), rotation=45, ha='right', va='top', fontsize=6.5)
-        plt.setp(ax.get_yticklabels(), fontsize=6.5)
-
+        # Kreslení histogramu (jedna figura per produkt)
+        plt.figure()
+        plt.hist(prices, bins=data['histBins'])  # použijeme přímo z data
+        title = f"{product_name} — histogram cen ({data['dateFrom']} až {data['dateTo']})\n" \
+                f"n={n}"
+        if avg is not None:
+            title += f", avg={avg:.2f}"
+        if med is not None:
+            title += f", median={med:.2f}"
+        if mode_val is not None:
+            title += f", mode={mode_val:.2f} (×{mode_count})"
+        plt.title(title)
+        plt.xlabel("Cena")
+        plt.ylabel("Frekvence")
+        plt.grid(True, linestyle=":", linewidth=0.5)
+        plt.tight_layout()
 
         fname = f"{sanitize_filename(str(product_id))}.png"
-        out_path = os.path.join(OUTPUT_DIR, fname)
-        plt.savefig(out_path, dpi=300, bbox_inches=None, pad_inches=0)
-        #plt.show()
-        plt.close(fig)
-        print(f"Uloženo: {out_path}")
-        img = Image.open(out_path)
-        display(img)
+        path = os.path.join(OUTPUT_DIR, fname)
+        plt.savefig(path, dpi=150)
+        plt.close()
+        print(f"Uloženo: {path}")
 
 
 def main():
     global data, OUTPUT_DIR
-
+    
     # Vyžadujeme povinný parametr work_dir
     if len(sys.argv) != 2:
-        print("Chybí parametr <work_dir>")
+        print("Použití: python histogram.py <work_dir>")
         sys.exit(1)
     
     work_dir = sys.argv[1]
-
     json_path = os.path.join(work_dir, "data.json")
-    print(f"Looking for JSON at: {json_path}")
-
+    
+    # data.json musí existovat
     if not os.path.exists(json_path):
         print(f"Chyba: Soubor {json_path} neexistuje.")
         sys.exit(1)
-
-    default_values = {'histBins': 30}
+    
+    # Načteme konfiguraci pomocí funkce z dbsettings
+    default_values = {
+        'histBins': 30
+    }
     data = load_data_json(json_path, default_values)
     OUTPUT_DIR = os.path.join(work_dir, "img/histogram")
-
+    
     print(f"Načítám data z DB …")
     df = fetch_dataframe()
     if df.empty:
@@ -189,6 +167,6 @@ def main():
     save_histograms(df)
     print("Hotovo.")
 
+
 if __name__ == "__main__":
     main()
-    
