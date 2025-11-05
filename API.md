@@ -66,15 +66,96 @@ Pro jiné SMTP servery:
 ## 🛒 Košíky
 **Base URL:** `/api/v1/baskets`
 
+### Přístupová Pravidla
+- Uživatel vidí **pouze své košíky** (`usr_id` = ID uživatele) + **sdílené košíky** (`usr_id` = 0)
+- Košík s `usr_id = 0` je **sdílený** (viditelný pro všechny uživatele)
+- Uživatel může editovat/mazat pouze **své košíky** nebo **sdílené košíky**
+
 | Endpoint | Method | Popis | Auth | Request Body | Response |
 |----------|--------|-------|------|--------------|----------|
-| `/` | GET | Seznam košíků | ✅ | - | `{items}` |
-| `/` | POST | Vytvoření košíku | ✅ | `{name}` | Nový košík |
-| `/:id` | PUT | Aktualizace košíku | ✅ | `{name}` | Aktualizovaný košík |
-| `/:id` | DELETE | Smazání košíku | ✅ | - | `{success, id}` |
+| `/` | GET | Seznam košíků uživatele + sdílených | ✅ | - | `{items}` |
+| `/` | POST | Vytvoření košíku | ✅ | `{name, usr_id?}` | Nový košík |
+| `/:id` | PUT | Aktualizace košíku | ✅ | `{name?, usr_id?}` | Aktualizovaný košík |
+| `/:id` | DELETE | Smazání košíku | ✅ | - | 204 No Content |
 | `/:id/products` | GET | Produkty v košíku | ✅ | - | `{items}` |
-| `/:id/products` | POST | Přidání produktů do košíku | ✅ | `{productIds: []}` | `{message}` |
-| `/:id/products/:productId` | DELETE | Odebrání produktu z košíku | ✅ | - | `{success}` |
+| `/:id/products` | POST | Přidání produktů do košíku | ✅ | `{productIds: []}` | 204 No Content |
+| `/:id/products/:productId` | DELETE | Odebrání produktu z košíku | ✅ | - | 204 No Content |
+
+### GET `/api/v1/baskets`
+Vrátí košíky pro přihlášeného uživatele.
+
+**Query parametry:**
+- `search` - fulltext vyhledávání v názvu košíku
+
+**Response:**
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "name": "Můj košík",
+      "usr_id": 5,
+      "created_at": "2025-11-05T10:00:00.000Z",
+      "itemCount": 10,
+      "isShared": 0
+    },
+    {
+      "id": 2,
+      "name": "Sdílený košík",
+      "usr_id": 0,
+      "created_at": "2025-11-05T10:00:00.000Z",
+      "itemCount": 5,
+      "isShared": 1
+    }
+  ]
+}
+```
+
+### POST `/api/v1/baskets`
+Vytvoří nový košík.
+
+**Request Body:**
+```json
+{
+  "name": "Název košíku",
+  "usr_id": 0  // Optional: 0 = sdílený, vynechat = vlastní košík
+}
+```
+
+**Response (201):**
+```json
+{
+  "id": 3,
+  "name": "Název košíku",
+  "usr_id": 0,
+  "isShared": true
+}
+```
+
+### PUT `/api/v1/baskets/:id`
+Aktualizuje košík (pouze vlastní nebo sdílené).
+
+**Request Body:**
+```json
+{
+  "name": "Nový název",      // Optional
+  "usr_id": 0                // Optional: změna vlastnictví
+}
+```
+
+**Response (200):**
+```json
+{
+  "id": 3,
+  "name": "Nový název",
+  "usr_id": 0,
+  "isShared": true
+}
+```
+
+**Errors:**
+- `403` - Nemáte oprávnění editovat tento košík
+- `404` - Košík nenalezen
 
 ## 📊 Analýzy
 **Base URL:** `/api/v1/analyses`
