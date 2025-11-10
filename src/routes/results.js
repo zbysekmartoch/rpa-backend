@@ -164,8 +164,9 @@ router.get('/:id/download', async (req, res, next) => {
     }
 
     // Nastavím hlavičky pro zip download
+    const zipFilename = `result-${id}.zip`;
     res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', `attachment; filename="result-${id}.zip"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${zipFilename}"`);
 
     // Vytvořím zip stream
     const archive = archiver('zip', {

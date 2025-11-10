@@ -65,9 +65,11 @@ router.get('/:id/files/:filename', async (req, res, next) => {
       : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
     // Nastav hlavičky pro download
+    // RFC 5987: filename* pro non-ASCII znaky (ž, á, é, atd.)
+    const encodedFilename = encodeURIComponent(filename);
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Length', stats.size);
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedFilename}`);
 
     // Streamuj soubor
     const fileStream = (await import('fs')).createReadStream(filePath);
