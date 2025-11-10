@@ -77,6 +77,10 @@ router.get('/health', async (req, res) => {
 // API routes - auth endpoint bez autentifikace
 router.use('/v1/auth', auth);
 
+// Public file downloads (bez auth pro direct links v prohlížeči)
+import resultsPublic from './results-public.js';
+router.use('/v1/results-public', resultsPublic);
+
 // Všechny ostatní v1 routes vyžadují autentifikaci
 router.use('/v1/categories', authenticateToken, categoriesTree);
 router.use('/v1/products', authenticateToken, products);

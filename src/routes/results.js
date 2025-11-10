@@ -109,7 +109,7 @@ router.get('/:id', async (req, res, next) => {
             extension: ext,
             size: stats.size,
             mtime: stats.mtime.toISOString(),
-            downloadUrl: `/api/v1/results/${id}/files/${encodeURIComponent(file.name)}`
+            downloadUrl: `/api/v1/results-public/${id}/files/${encodeURIComponent(file.name)}`
           });
         }
       }
@@ -180,71 +180,6 @@ router.get('/:id/download', async (req, res, next) => {
 
     // Dokončím archiv
     await archive.finalize();
-
-  } catch (e) {
-    next(e);
-  }
-});
-
-/**
- * GET /api/v1/results/:id/files/:filename
- * Stáhne konkrétní DOCX nebo XLSX soubor z výsledku
- */
-router.get('/:id/files/:filename', async (req, res, next) => {
-  try {
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id)) {
-      return res.status(400).json({ error: 'Invalid id' });
-    }
-
-    const filename = req.params.filename;
-    
-    // Bezpečnostní kontrola - žádný path traversal
-    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
-      return res.status(400).json({ error: 'Invalid filename' });
-    }
-
-    // Kontrola přípony - pouze DOCX a XLSX
-    const ext = path.extname(filename).toLowerCase();
-    if (ext !== '.docx' && ext !== '.xlsx') {
-      return res.status(400).json({ error: 'Only DOCX and XLSX files are allowed' });
-    }
-
-    // Ověř, že výsledek existuje
-    const rows = await query(
-      `SELECT id FROM result WHERE id = ?`,
-      [id]
-    );
-
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'Result not found' });
-    }
-
-    const filePath = path.join(BACKEND_DIR, 'results', id.toString(), filename);
-    
-    // Zkontroluj, že soubor existuje
-    try {
-      await fs.access(filePath);
-    } catch {
-      return res.status(404).json({ error: 'File not found' });
-    }
-
-    // Zjisti velikost souboru
-    const stats = await fs.stat(filePath);
-
-    // Nastav správný Content-Type
-    const contentType = ext === '.docx' 
-      ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-
-    // Nastav hlavičky pro download
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Length', stats.size);
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-
-    // Streamuj soubor
-    const fileStream = (await import('fs')).createReadStream(filePath);
-    fileStream.pipe(res);
 
   } catch (e) {
     next(e);

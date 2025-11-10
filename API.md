@@ -368,7 +368,13 @@ Správa výsledků analýz včetně stahování jednotlivých souborů nebo cel�
 | `/` | GET | Seznam výsledků analýz | ✅ | `analysis_id` | `{items}` |
 | `/:id` | GET | Detail výsledku se seznamem souborů | ✅ | - | Výsledek + `files[]` |
 | `/:id/download` | GET | Stažení ZIP se všemi výsledky | ✅ | - | ZIP soubor |
-| `/:id/files/:filename` | GET | Stažení konkrétního DOCX/XLSX | ✅ | - | DOCX/XLSX soubor |
+
+### Veřejné stahování souborů
+**Base URL:** `/api/v1/results-public`
+
+| Endpoint | Method | Popis | Auth | Response |
+|----------|--------|-------|------|----------|
+| `/:id/files/:filename` | GET | Stažení konkrétního DOCX/XLSX | ❌ | DOCX/XLSX soubor |
 
 ### GET `/api/v1/results/:id`
 Vrátí detail výsledku analýzy včetně seznamu dostupných DOCX a XLSX souborů.
@@ -389,28 +395,28 @@ Vrátí detail výsledku analýzy včetně seznamu dostupných DOCX a XLSX soubo
       "extension": ".docx",
       "size": 45678,
       "mtime": "2025-11-10T10:05:00.000Z",
-      "downloadUrl": "/api/v1/results/1/files/Manažerský%20výstup.docx"
+      "downloadUrl": "/api/v1/results-public/1/files/Manažerský%20výstup.docx"
     },
     {
       "name": "Záznam o provedení analýzy.docx",
       "extension": ".docx",
       "size": 23456,
       "mtime": "2025-11-10T10:05:01.000Z",
-      "downloadUrl": "/api/v1/results/1/files/Záznam%20o%20provedení%20analýzy.docx"
+      "downloadUrl": "/api/v1/results-public/1/files/Záznam%20o%20provedení%20analýzy.docx"
     },
     {
       "name": "data.xlsx",
       "extension": ".xlsx",
       "size": 123456,
       "mtime": "2025-11-10T10:04:30.000Z",
-      "downloadUrl": "/api/v1/results/1/files/data.xlsx"
+      "downloadUrl": "/api/v1/results-public/1/files/data.xlsx"
     }
   ]
 }
 ```
 
-### GET `/api/v1/results/:id/files/:filename`
-Stáhne konkrétní DOCX nebo XLSX soubor z výsledku analýzy.
+### GET `/api/v1/results-public/:id/files/:filename`
+Stáhne konkrétní DOCX nebo XLSX soubor z výsledku analýzy. **Nevyžaduje autentifikaci** - vhodné pro direct links.
 
 **Parametry:**
 - `id` - ID výsledku
@@ -427,8 +433,18 @@ Stáhne konkrétní DOCX nebo XLSX soubor z výsledku analýzy.
 - `404` - Výsledek nebo soubor neexistuje
 
 **Příklad:**
+```html
+<!-- Direct link v HTML -->
+<a href="/api/v1/results-public/1/files/Manažerský%20výstup.docx">
+  Stáhnout report
+</a>
 ```
-GET /api/v1/results/1/files/Manažerský%20výstup.docx
+
+**JavaScript:**
+```javascript
+// Použití downloadUrl z files pole
+const file = result.files[0];
+window.open(file.downloadUrl); // Funguje bez Bearer tokenu!
 ```
 
 ### GET `/api/v1/results/:id/download`
