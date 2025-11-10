@@ -361,11 +361,83 @@ Konfigurováno v `config.json`, výchozí:
 ## 📁 Výsledky
 **Base URL:** `/api/v1/results`
 
+Správa výsledků analýz včetně stahování jednotlivých souborů nebo celého ZIP archivu.
+
 | Endpoint | Method | Popis | Auth | Query Params | Response |
 |----------|--------|-------|------|--------------|----------|
 | `/` | GET | Seznam výsledků analýz | ✅ | `analysis_id` | `{items}` |
-| `/:id` | GET | Detail výsledku | ✅ | - | Výsledek |
-| `/:id/download` | GET | Stažení ZIP s výsledky | ✅ | - | ZIP soubor |
+| `/:id` | GET | Detail výsledku se seznamem souborů | ✅ | - | Výsledek + `files[]` |
+| `/:id/download` | GET | Stažení ZIP se všemi výsledky | ✅ | - | ZIP soubor |
+| `/:id/files/:filename` | GET | Stažení konkrétního DOCX/XLSX | ✅ | - | DOCX/XLSX soubor |
+
+### GET `/api/v1/results/:id`
+Vrátí detail výsledku analýzy včetně seznamu dostupných DOCX a XLSX souborů.
+
+**Response:**
+```json
+{
+  "id": 1,
+  "analysis_id": 5,
+  "analysisName": "Základní analýza",
+  "status": "completed",
+  "created_at": "2025-11-10T10:00:00.000Z",
+  "output": "Analysis completed successfully",
+  "report": null,
+  "files": [
+    {
+      "name": "Manažerský výstup.docx",
+      "extension": ".docx",
+      "size": 45678,
+      "mtime": "2025-11-10T10:05:00.000Z",
+      "downloadUrl": "/api/v1/results/1/files/Manažerský%20výstup.docx"
+    },
+    {
+      "name": "Záznam o provedení analýzy.docx",
+      "extension": ".docx",
+      "size": 23456,
+      "mtime": "2025-11-10T10:05:01.000Z",
+      "downloadUrl": "/api/v1/results/1/files/Záznam%20o%20provedení%20analýzy.docx"
+    },
+    {
+      "name": "data.xlsx",
+      "extension": ".xlsx",
+      "size": 123456,
+      "mtime": "2025-11-10T10:04:30.000Z",
+      "downloadUrl": "/api/v1/results/1/files/data.xlsx"
+    }
+  ]
+}
+```
+
+### GET `/api/v1/results/:id/files/:filename`
+Stáhne konkrétní DOCX nebo XLSX soubor z výsledku analýzy.
+
+**Parametry:**
+- `id` - ID výsledku
+- `filename` - Název souboru (z `files` pole)
+
+**Response:**
+- Binary file download
+- Content-Type: `application/vnd.openxmlformats-officedocument.wordprocessingml.document` (DOCX)
+- Content-Type: `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` (XLSX)
+- Content-Disposition: `attachment; filename="..."`
+
+**Errors:**
+- `400` - Neplatný filename nebo nepodporovaná přípona
+- `404` - Výsledek nebo soubor neexistuje
+
+**Příklad:**
+```
+GET /api/v1/results/1/files/Manažerský%20výstup.docx
+```
+
+### GET `/api/v1/results/:id/download`
+Stáhne všechny soubory z výsledku jako ZIP archiv.
+
+**Response:**
+- ZIP archiv se všemi soubory
+- Content-Type: `application/zip`
+- Content-Disposition: `attachment; filename="result-{id}.zip"`
 
 ## 🤖 Harvestery
 **Base URL:** `/api/v1/harvesters`
