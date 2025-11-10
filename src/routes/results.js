@@ -186,4 +186,48 @@ router.get('/:id/download', async (req, res, next) => {
   }
 });
 
+/**
+ * DELETE /api/v1/results/:id
+ * Smaže výsledek z DB a odstraní složku s výsledky
+ */
+router.delete('/:id', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: 'Invalid id' });
+    }
+
+    // Ověř že výsledek existuje
+    const rows = await query(
+      `SELECT id FROM result WHERE id = ?`,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Result not found' });
+    }
+
+    // Smaž složku s výsledky pokud existuje
+    const resultDir = path.join(BACKEND_DIR, 'results', id.toString());
+    try {
+      await fs.rm(resultDir, { recursive: true, force: true });
+    } catch (err) {
+      console.warn(`Failed to delete result directory ${resultDir}:`, err.message);
+      // Pokračuj i když se nepodařilo smazat složku
+    }
+
+    // Smaž záznam z DB
+    await query('DELETE FROM result WHERE id = ?', [id]);
+
+    res.json({
+      success: true,
+      id: id,
+      message: 'Result deleted successfully'
+    });
+
+  } catch (e) {
+    next(e);
+  }
+});
+
 export default router;

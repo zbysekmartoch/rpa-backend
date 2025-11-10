@@ -367,6 +367,7 @@ Správa výsledků analýz včetně stahování jednotlivých souborů nebo cel�
 |----------|--------|-------|------|--------------|----------|
 | `/` | GET | Seznam výsledků analýz | ✅ | `analysis_id` | `{items}` |
 | `/:id` | GET | Detail výsledku se seznamem souborů | ✅ | - | Výsledek + `files[]` |
+| `/:id` | DELETE | Smazání výsledku (DB + složka) | ✅ | - | `{success, id, message}` |
 | `/:id/download` | GET | Stažení ZIP se všemi výsledky | ✅ | - | ZIP soubor |
 
 ### Veřejné stahování souborů
@@ -454,6 +455,24 @@ Stáhne všechny soubory z výsledku jako ZIP archiv.
 - ZIP archiv se všemi soubory
 - Content-Type: `application/zip`
 - Content-Disposition: `attachment; filename="result-{id}.zip"`
+
+### DELETE `/api/v1/results/:id`
+Smaže výsledek analýzy z databáze a odstraní složku s výsledky.
+
+**Response:**
+```json
+{
+  "success": true,
+  "id": 1,
+  "message": "Result deleted successfully"
+}
+```
+
+**Errors:**
+- `400` - Neplatný ID
+- `404` - Výsledek nenalezen
+
+**Poznámka:** Pokud se nepodaří smazat složku, operace pokračuje a záznam z DB se odstraní.
 
 ## 🤖 Harvestery
 **Base URL:** `/api/v1/harvesters`
