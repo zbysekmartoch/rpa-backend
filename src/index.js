@@ -36,18 +36,8 @@ app.use(express.json({ limit: '1mb' }));
 // Rate limiting (základ, upravíme podle potřeby)
 app.use('/api/', rateLimit({ windowMs: 60_000, max: 300 }));
 
-// Mount API - neautentifikované routes (auth)
+// Mount API routes
 app.use('/api', api);
-
-// Autentifikace pro všechny ostatní API routes
-app.use('/api/v1/products', authenticateToken);
-app.use('/api/v1/baskets', authenticateToken);
-app.use('/api/v1/analyses', authenticateToken);
-app.use('/api/v1/results', authenticateToken);
-app.use('/api/v1/harvesters', authenticateToken);
-app.use('/api/v1/workflows', authenticateToken);
-app.use('/api/v1/data-sources', authenticateToken);
-app.use('/api/v1/harvest-schedule', authenticateToken);
 
 // 404 + error handler
 app.use(notFound);

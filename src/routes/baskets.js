@@ -15,7 +15,7 @@ const router = Router();
 router.get('/', async (req, res, next) => {
   try {
     const { search } = req.query;
-    const userId = req.user?.id; // Z JWT middleware
+    const userId = req.userId; // Z JWT middleware
     
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
@@ -62,7 +62,7 @@ router.get('/', async (req, res, next) => {
 router.get('/:id/products', async (req, res, next) => {
   try {
     const id = Number(req.params.id);
-    const userId = req.user?.id;
+    const userId = req.userId;
     
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
@@ -112,7 +112,7 @@ router.get('/:id/products', async (req, res, next) => {
 router.post('/', async (req, res, next) => {
   try {
     const { name, usr_id } = req.body ?? {};
-    const userId = req.user?.id;
+    const userId = req.userId;
     
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
@@ -160,7 +160,7 @@ router.put('/:id', async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     const { name, usr_id } = req.body ?? {};
-    const userId = req.user?.id;
+    const userId = req.userId;
     
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
@@ -243,7 +243,7 @@ router.put('/:id', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     const id = Number(req.params.id);
-    const userId = req.user?.id;
+    const userId = req.userId;
     
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
@@ -287,7 +287,7 @@ router.post('/:id/products', async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     const { productIds } = req.body ?? {};
-    const userId = req.user?.id;
+    const userId = req.userId;
     
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
@@ -325,7 +325,7 @@ router.delete('/:id/products/:productId', async (req, res, next) => {
   try {
     const id = Number(req.params.id);
     const pid = Number(req.params.productId);
-    const userId = req.user?.id;
+    const userId = req.userId;
     
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });

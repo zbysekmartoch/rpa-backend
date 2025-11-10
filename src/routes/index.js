@@ -17,6 +17,8 @@ import auth from './auth.js';
 import dataSources from './data-sources.js';
 import harvestSchedule from './harvest-schedule.js';
 import harvest from './harvest.js';
+import scripts from './scripts.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -72,18 +74,21 @@ router.get('/health', async (req, res) => {
   }
 });
 
-// API routes
-router.use('/v1/categories', categoriesTree);
-router.use('/v1/products', products);
-router.use('/v1/baskets', baskets);
-router.use('/v1/analyses', analyses);
-router.use('/v1/results', results);
-router.use('/v1/harvesters', harvesters);
-router.use('/v1/workflows', workflows);
-router.use('/v1/data-sources', dataSources);
-router.use('/v1/harvest-schedule', harvestSchedule);
-router.use('/v1/harvest', harvest);
+// API routes - auth endpoint bez autentifikace
 router.use('/v1/auth', auth);
+
+// Všechny ostatní v1 routes vyžadují autentifikaci
+router.use('/v1/categories', authenticateToken, categoriesTree);
+router.use('/v1/products', authenticateToken, products);
+router.use('/v1/baskets', authenticateToken, baskets);
+router.use('/v1/analyses', authenticateToken, analyses);
+router.use('/v1/results', authenticateToken, results);
+router.use('/v1/harvesters', authenticateToken, harvesters);
+router.use('/v1/workflows', authenticateToken, workflows);
+router.use('/v1/data-sources', authenticateToken, dataSources);
+router.use('/v1/harvest-schedule', authenticateToken, harvestSchedule);
+router.use('/v1/harvest', authenticateToken, harvest);
+router.use('/v1/scripts', authenticateToken, scripts);
 // Middleware na konec
 router.use(notFound);
 router.use(errorHandler);

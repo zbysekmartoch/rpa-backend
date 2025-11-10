@@ -157,7 +157,169 @@ Aktualizuje košík (pouze vlastní nebo sdílené).
 - `403` - Nemáte oprávnění editovat tento košík
 - `404` - Košík nenalezen
 
-## 📊 Analýzy
+## � Správa Skriptů
+**Base URL:** `/api/v1/scripts`
+
+Umožňuje správu souborů ve složce `scripts/` a podadresářích pro interní administraci.
+
+### Bezpečnost
+- ✅ Všechny endpointy vyžadují autentifikaci
+- ✅ Striktní omezení na `scripts/` složku
+- ✅ Path traversal protection (`.., absolutní cesty`)
+- ✅ Validace všech cest pomocí `path.resolve()`
+
+| Endpoint | Method | Popis | Auth | Request | Response |
+|----------|--------|-------|------|---------|----------|
+| `/` | GET | Výpis souborů a složek | ✅ | `?subdir=analyzy` | `{root, items[], count}` |
+| `/download` | GET | Stažení souboru | ✅ | `?file=analyzy/script.py` | File download |
+| `/content` | GET | Načtení obsahu textového souboru | ✅ | `?file=analyzy/script.py` | `{file, content, size, mtime}` |
+| `/content` | PUT | Uložení změn textového souboru | ✅ | `{file, content}` | `{success, file, size, mtime}` |
+| `/upload` | POST | Nahrání nového souboru | ✅ | FormData: `file`, `targetPath` | `{success, file{...}}` |
+| `/` | DELETE | Smazání souboru | ✅ | `?file=analyzy/script.py` | `{success, file}` |
+
+### GET `/api/v1/scripts`
+Vypíše soubory ve složce `scripts/` (až 2 úrovně hloubky).
+
+**Query parametry:**
+- `subdir` - Omezí výpis na podadresář (např. `analyzy`, `reports`)
+
+**Response:**
+```json
+{
+  "root": "analyzy",
+  "items": [
+    {
+      "name": "script.py",
+      "path": "analyzy/script.py",
+      "type": "file",
+      "extension": ".py",
+      "size": 1024,
+      "mtime": "2025-11-10T10:00:00.000Z",
+      "isText": true
+    },
+    {
+      "name": "subfolder",
+      "path": "analyzy/subfolder",
+      "type": "directory",
+      "size": 0,
+      "mtime": "2025-11-10T10:00:00.000Z",
+      "children": [...]
+    }
+  ],
+  "count": 2
+}
+```
+
+**Textové přípony:** `.js`, `.py`, `.txt`, `.md`, `.json`, `.workflow`, `.sql`, `.sh`, `.css`, `.html`, `.xml`, `.yaml`, `.yml`, `.env`
+
+### GET `/api/v1/scripts/download`
+Stáhne konkrétní soubor (binární i textový).
+
+**Query:**
+```
+?file=analyzy/script.py
+```
+
+**Response:** File download (attachment)
+
+### GET `/api/v1/scripts/content`
+Načte obsah textového souboru (UTF-8).
+
+**Query:**
+```
+?file=analyzy/script.py
+```
+
+**Response:**
+```json
+{
+  "file": "analyzy/script.py",
+  "content": "#!/usr/bin/env python3\n...",
+  "size": 1024,
+  "mtime": "2025-11-10T10:00:00.000Z"
+}
+```
+
+### PUT `/api/v1/scripts/content`
+Uloží změny v textovém souboru (pouze existující soubory).
+
+**Request Body:**
+```json
+{
+  "file": "analyzy/script.py",
+  "content": "#!/usr/bin/env python3\nprint('Updated')"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "file": "analyzy/script.py",
+  "size": 1050,
+  "mtime": "2025-11-10T10:05:00.000Z"
+}
+```
+
+**Errors:**
+- `404` - Soubor nenalezen (pro vytvoření nových použij upload)
+
+### POST `/api/v1/scripts/upload`
+Nahraje nový soubor nebo přepíše existující.
+
+**Request:** `multipart/form-data`
+- `file` - Soubor (max 50 MB)
+- `targetPath` - Relativní cesta k cílovému adresáři (např. `analyzy`)
+
+**Example (JavaScript):**
+```javascript
+const formData = new FormData();
+formData.append('file', fileBlob, 'script.py');
+formData.append('targetPath', 'analyzy');
+
+const response = await fetch('/api/v1/scripts/upload', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`
+  },
+  body: formData
+});
+```
+
+**Response (201):**
+```json
+{
+  "success": true,
+  "file": {
+    "name": "script.py",
+    "path": "analyzy/script.py",
+    "size": 1024,
+    "mtime": "2025-11-10T10:10:00.000Z"
+  }
+}
+```
+
+### DELETE `/api/v1/scripts`
+Smaže soubor.
+
+**Query:**
+```
+?file=analyzy/script.py
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "file": "analyzy/script.py"
+}
+```
+
+**Errors:**
+- `400` - Invalid path, Path traversal attempt
+- `404` - File/Directory not found
+
+## �📊 Analýzy
 **Base URL:** `/api/v1/analyses`
 
 | Endpoint | Method | Popis | Auth | Request Body | Response |
