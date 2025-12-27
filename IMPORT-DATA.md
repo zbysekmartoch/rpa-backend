@@ -1,16 +1,16 @@
 # Data Importer
 
-Node.js script pro import dat z ZIP archivů do MySQL databáze.
+Node.js script for importing data from ZIP archives into a MySQL database.
 
-## Instalace
+## Installation
 
 ```bash
 npm install
 ```
 
-## Konfigurace
+## Configuration
 
-Nastavte připojovací údaje k MySQL databázi v souboru `.env`:
+Set database connection credentials in the `.env` file:
 
 ```
 DB_HOST=localhost
@@ -20,26 +20,26 @@ DB_PASSWORD=your_password
 DB_NAME=your_database
 ```
 
-## Použití
+## Usage
 
 ```bash
-node import-data.js <cesta-k-zip-souboru>
+node import-data.cjs <path-to-zip-file>
 ```
 
-Příklad:
+Example:
 ```bash
-node import-data.js /path/to/data.zip
+node import-data.cjs /path/to/data.zip
 ```
 
-## Struktura dat
+## Data Structure
 
-### Produktové soubory
+### Product Files
 
-Soubory s názvy ve tvaru:
-- `YYYY-MM-DD-hhmm-products.json` (novější verze)
-- `YYYY-MM-DD-products.json` (starší verze)
+Files with names matching the pattern:
+- `YYYY-MM-DD-hhmm-products.json` (newer version)
+- `YYYY-MM-DD-products.json` (older version)
 
-Struktura JSON:
+JSON structure:
 ```json
 [
   {
@@ -47,22 +47,22 @@ Struktura JSON:
     "name": "Bambu Lab P1S Combo",
     "url": "https://example.com/product",
     "priceText": "699,00 – 1 267,92 €",
-    "seller": "v 10 obchodoch",
+    "seller": "in 10 stores",
     "brand": "Bambu Lab",
-    "category": "Heureka.sk|Elektronika|...",
+    "category": "Heureka.sk|Electronics|...",
     "date": "2025-10-05",
     "harvested_at": "2025-10-05 18:50:10"
   }
 ]
 ```
 
-### Cenové soubory
+### Price Files
 
-Soubory s názvy ve tvaru:
-- `YYYY-MM-DD-hhmm-prices.json` (novější verze)
-- `YYYY-MM-DD-prices.json` (starší verze)
+Files with names matching the pattern:
+- `YYYY-MM-DD-hhmm-prices.json` (newer version)
+- `YYYY-MM-DD-prices.json` (older version)
 
-Struktura JSON:
+JSON structure:
 ```json
 [
   {
@@ -75,7 +75,11 @@ Struktura JSON:
 ]
 ```
 
-## Databázové tabulky
+### Product Images
+
+Files matching the pattern `product_*.jpg` are automatically copied to `common/img/products/` directory.
+
+## Database Tables
 
 ### imp_product
 
@@ -83,13 +87,13 @@ Struktura JSON:
 CREATE TABLE imp_product (
   id VARCHAR(255),
   name VARCHAR(255),
-  url VARCHAR(500),
+  url VARCHAR(1500),
   priceText VARCHAR(255),
   seller VARCHAR(255),
   brand VARCHAR(255),
-  category VARCHAR(500),
-  date VARCHAR(20),
-  PRIMARY KEY (id, date)
+  category VARCHAR(255),
+  date DATE,
+  UNIQUE KEY (id, date)
 );
 ```
 
@@ -100,31 +104,75 @@ CREATE TABLE imp_price (
   price VARCHAR(255),
   seller VARCHAR(255),
   productId VARCHAR(255),
-  date VARCHAR(20),
-  PRIMARY KEY (productId, seller, date)
+  date DATE,
+  UNIQUE KEY (date, seller, productId)
 );
 ```
 
-## Post-import SQL
+### importlog
 
-Po importu dat se automaticky spustí SQL dotazy ze souboru `after-import.sql` (pokud existuje).
+The script automatically creates an `importlog` table to track all imports:
 
-## Logování
+```sql
+CREATE TABLE IF NOT EXISTS importlog (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  import_start DATETIME NOT NULL,
+  import_end DATETIME DEFAULT NULL,
+  product_count INT DEFAULT 0,
+  price_count INT DEFAULT 0,
+  images_copied INT DEFAULT 0,
+  files_processed INT DEFAULT 0,
+  zip_file VARCHAR(500) DEFAULT NULL,
+  log_content LONGTEXT DEFAULT NULL,
+  error_content LONGTEXT DEFAULT NULL,
+  status ENUM('running', 'completed', 'failed') DEFAULT 'running',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
 
-Script vytváří dva soubory s logy:
-- `import-YYYY-MM-DD-hhmm.log` - běžné logy
-- `import-YYYY-MM-DD-hhmm.err` - chybové logy
+## SQL Scripts
 
-## Funkce
+SQL scripts are located in the `sql/` directory:
 
-- Rozbalení ZIP archivů
-- Rekurzivní procházení složek
-- Zpracování produktových i cenových JSON souborů
-- Podpora starších i novějších formátů souborů
-- Automatická extrakce datumu z názvů souborů
-- Batch INSERT operace pro rychlý import
-- INSERT IGNORE pro prevenci duplikátů
-- Post-import SQL dotazy
-- Podrobné logování
-- Automatické úklid dočasných souborů
-- Kompletní error handling
+- `before-import.sql` - Executed before data import (e.g., truncating temporary tables)
+- `after-import.sql` - Executed after data import (e.g., data transformations, statistics)
+
+## Logging
+
+The script creates log files in the `logs/` directory:
+- `logs/import-YYYY-MM-DD-hhmm.log` - Standard logs
+- `logs/import-YYYY-MM-DD-hhmm.err` - Error logs
+
+Additionally, all logs are stored in the `importlog` database table for each import.
+
+## Directory Structure
+
+```
+backend/
+├── import-data.cjs      # Main import script
+├── common/
+│   └── img/
+│       └── products/    # Product images copied from ZIP
+├── logs/                # Import log files
+│   ├── import-*.log
+│   └── import-*.err
+└── sql/
+    ├── before-import.sql
+    └── after-import.sql
+```
+
+## Features
+
+- ZIP archive extraction
+- Recursive directory traversal
+- Processing of product and price JSON files
+- Automatic product image copying (`product_*.jpg`)
+- Support for older and newer file formats
+- Automatic date extraction from filenames
+- Batch INSERT operations for fast import
+- INSERT IGNORE to prevent duplicates
+- Pre-import and post-import SQL execution
+- Import logging to database table
+- Detailed file logging
+- Automatic cleanup of temporary files
+- Comprehensive error handling

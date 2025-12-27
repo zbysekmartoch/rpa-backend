@@ -116,4 +116,28 @@ SET p.dib = CASE
               ELSE r.ib / r.ib_prev
             END;
 
+drop table if exists list_product
+;
+create table list_product as
 
+    SELECT
+        p.id,
+        p.name,
+        p.brand,
+        p.category,
+        p.url,
+        COUNT(DISTINCT pr.seller) as sellerCount,
+        COUNT(pr.id) as priceCount,
+        min(pr.date) minDate,
+        max(pr.date) maxDate
+    FROM product p
+    left JOIN price pr ON pr.product_id = p.id AND pr.invalid = 0
+    #WHERE (p.category LIKE CONCAT('Heureka.cz', '|%') OR p.category = CONCAT('Heureka.cz', '|', p.name))
+    #WHERE (p.category LIKE 'Heureka.cz|%') # OR p.category = CONCAT('Heureka.cz', '|', p.name)
+    GROUP BY p.id #, p.name, p.brand, p.category
+    ORDER BY p.id
+    LIMIT 20000 OFFSET 0
+  ;
+ALTER TABLE list_product
+  ADD INDEX ix_product_category (category);
+;

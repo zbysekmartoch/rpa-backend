@@ -39,14 +39,12 @@ r.get('/', async (req, res, next) => {
         p.brand, 
         p.category,
         p.url,
-        COUNT(DISTINCT pr.seller) as sellerCount,
-        COUNT(pr.id) as priceCount,
-        min(pr.date) minDate,
-        max(pr.date) maxDate
-    FROM product p
-    LEFT JOIN price pr ON pr.product_id = p.id AND pr.invalid = 0
+        sellerCount,
+        priceCount,
+        minDate,
+        maxDate
+    FROM list_product p
     WHERE ${where}
-    GROUP BY p.id #, p.name, p.brand, p.category
     ORDER BY p.id
     LIMIT ${limit} OFFSET ${offset}
   `;

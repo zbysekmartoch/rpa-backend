@@ -6,6 +6,13 @@ const mysql = require('mysql2/promise');
 const extract = require('extract-zip');
 require('dotenv').config();
 
+// Base directory paths
+const BACKEND_DIR = __dirname;
+const LOGS_DIR = path.join(BACKEND_DIR, '/logs');
+const SQL_DIR = path.join(BACKEND_DIR, '/sql');
+const PRODUCTS_IMG_DIR = path.join(BACKEND_DIR, '/common/img/products');
+
+
 // Logger class for handling log and error files
 class Logger {
   constructor() {
@@ -13,14 +20,21 @@ class Logger {
     const timestamp = now.toISOString().replace(/[-:]/g, '').replace('T', '-').split('.')[0];
     const dateFormatted = timestamp.substring(0, 15); // YYYY-MM-DD-hhmm
 
-    this.logFile = `import-${dateFormatted}.log`;
-    this.errFile = `import-${dateFormatted}.err`;
+    this.logFile = path.join(LOGS_DIR, `import-${dateFormatted}.log`);
+    this.errFile = path.join(LOGS_DIR, `import-${dateFormatted}.err`);
+    this.logContent = '';
+    this.errContent = '';
+  }
+
+  async ensureLogsDir() {
+    await fs.mkdir(LOGS_DIR, { recursive: true });
   }
 
   async log(message) {
     const timestamp = new Date().toISOString();
     const logMessage = `[${timestamp}] ${message}\n`;
     console.log(message);
+    this.logContent += logMessage;
     await fs.appendFile(this.logFile, logMessage, 'utf8');
   }
 
@@ -28,7 +42,16 @@ class Logger {
     const timestamp = new Date().toISOString();
     const errorMessage = error ? `[${timestamp}] ${message}: ${error.message}\n${error.stack}\n` : `[${timestamp}] ${message}\n`;
     console.error(message, error || '');
+    this.errContent += errorMessage;
     await fs.appendFile(this.errFile, errorMessage, 'utf8');
+  }
+
+  getLogContent() {
+    return this.logContent;
+  }
+
+  getErrorContent() {
+    return this.errContent;
   }
 }
 
@@ -39,12 +62,15 @@ class DataImporter {
     this.logger = logger;
     this.connection = null;
     this.extractPath = null;
+    this.importStartTime = null;
+    this.importEndTime = null;
     this.stats = {
       productsProcessed: 0,
       productsInserted: 0,
       pricesProcessed: 0,
       pricesInserted: 0,
-      filesProcessed: 0
+      filesProcessed: 0,
+      imagesCopied: 0
     };
   }
 
@@ -112,11 +138,26 @@ class DataImporter {
         } else if (entry.isFile() && entry.name.endsWith('.json')) {
           // Process JSON files
           await this.processJsonFile(fullPath, entry.name);
+        } else if (entry.isFile() && /^product_.*\.jpg$/i.test(entry.name)) {
+          // Copy product images to common/img/products/
+          await this.copyProductImage(fullPath, entry.name);
         }
       }
     } catch (error) {
       await this.logger.error(`Failed to traverse directory: ${dirPath}`, error);
       throw error;
+    }
+  }
+
+  async copyProductImage(filePath, fileName) {
+    try {
+      await fs.mkdir(PRODUCTS_IMG_DIR, { recursive: true });
+      const destPath = path.join(PRODUCTS_IMG_DIR, fileName);
+      await fs.copyFile(filePath, destPath);
+      this.stats.imagesCopied++;
+      await this.logger.log(`Copied product image: ${fileName}`);
+    } catch (error) {
+      await this.logger.error(`Failed to copy product image: ${fileName}`, error);
     }
   }
 
@@ -250,14 +291,14 @@ class DataImporter {
     }
   }
 
-  async executeAfterImportSQL() {
-    const sqlFilePath = path.join(process.cwd(), 'after-import.sql');
+  async executeSQLSeries(fileName) {
+    const sqlFilePath = path.join(SQL_DIR, fileName);
 
     try {
-      // Check if after-import.sql exists
+      // Check if sql file exists
       await fs.access(sqlFilePath);
 
-      await this.logger.log('Executing after-import.sql queries');
+      await this.logger.log(`Executing ${fileName} queries`);
 
       const sqlContent = await fs.readFile(sqlFilePath, 'utf8');
 
@@ -280,19 +321,87 @@ class DataImporter {
         }
       }
 
-      await this.logger.log('All after-import queries executed successfully');
+      await this.logger.log(`All ${fileName} queries executed successfully`);
     } catch (error) {
       if (error.code === 'ENOENT') {
-        await this.logger.log('after-import.sql not found, skipping post-import queries');
+        await this.logger.log(`${fileName} not found, skipping queries`);
       } else {
-        await this.logger.error('Failed to execute after-import.sql', error);
+        await this.logger.error(`Failed to execute ${fileName}`, error);
         throw error;
       }
     }
+
+  }
+
+  async executeAfterImportSQL() {
+    await this.executeSQLSeries('after-import.sql');
+  }
+
+  async beforeImportSQL() {
+    await this.executeSQLSeries('before-import.sql');
+  }
+
+  async ensureImportLogTable() {
+    const createTableQuery = `
+      CREATE TABLE IF NOT EXISTS importlog (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        import_start DATETIME NOT NULL,
+        import_end DATETIME DEFAULT NULL,
+        product_count INT DEFAULT 0,
+        price_count INT DEFAULT 0,
+        images_copied INT DEFAULT 0,
+        files_processed INT DEFAULT 0,
+        zip_file VARCHAR(500) DEFAULT NULL,
+        log_content LONGTEXT DEFAULT NULL,
+        error_content LONGTEXT DEFAULT NULL,
+        status ENUM('running', 'completed', 'failed') DEFAULT 'running',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+    `;
+    await this.connection.execute(createTableQuery);
+    await this.logger.log('Import log table ensured');
+  }
+
+  async createImportLogEntry() {
+    const query = `
+      INSERT INTO importlog (import_start, zip_file, status)
+      VALUES (NOW(), ?, 'running')
+    `;
+    const [result] = await this.connection.execute(query, [this.zipPath]);
+    this.importLogId = result.insertId;
+    await this.logger.log(`Import log entry created with ID: ${this.importLogId}`);
+  }
+
+  async updateImportLogEntry(status = 'completed') {
+    const query = `
+      UPDATE importlog
+      SET import_end = NOW(),
+          product_count = ?,
+          price_count = ?,
+          images_copied = ?,
+          files_processed = ?,
+          log_content = ?,
+          error_content = ?,
+          status = ?
+      WHERE id = ?
+    `;
+    await this.connection.execute(query, [
+      this.stats.productsInserted,
+      this.stats.pricesInserted,
+      this.stats.imagesCopied,
+      this.stats.filesProcessed,
+      this.logger.getLogContent(),
+      this.logger.getErrorContent(),
+      status,
+      this.importLogId
+    ]);
+    await this.logger.log(`Import log entry updated with status: ${status}`);
   }
 
   async run() {
+    let importFailed = false;
     try {
+      this.importStartTime = new Date();
       await this.logger.log('=== Import process started ===');
       await this.logger.log(`ZIP file: ${this.zipPath}`);
 
@@ -302,26 +411,45 @@ class DataImporter {
       // Connect to database
       await this.connect();
 
+      // Ensure import log table exists and create entry
+      await this.ensureImportLogTable();
+      await this.createImportLogEntry();
+
+      await this.beforeImportSQL();
       // Extract ZIP
       const extractedPath = await this.extractZip();
 
-      // Traverse and process all JSON files
+      // Traverse and process all JSON files and product images
       await this.traverseDirectory(extractedPath);
 
       // Execute after-import SQL queries
       await this.executeAfterImportSQL();
 
       // Log statistics
+      this.importEndTime = new Date();
       await this.logger.log('=== Import statistics ===');
       await this.logger.log(`Files processed: ${this.stats.filesProcessed}`);
       await this.logger.log(`Products processed: ${this.stats.productsProcessed}`);
       await this.logger.log(`Products inserted: ${this.stats.productsInserted}`);
       await this.logger.log(`Prices processed: ${this.stats.pricesProcessed}`);
       await this.logger.log(`Prices inserted: ${this.stats.pricesInserted}`);
+      await this.logger.log(`Images copied: ${this.stats.imagesCopied}`);
       await this.logger.log('=== Import completed successfully ===');
 
+      // Update import log entry
+      await this.updateImportLogEntry('completed');
+
     } catch (error) {
+      importFailed = true;
       await this.logger.error('Import process failed', error);
+      // Try to update import log with failed status
+      if (this.importLogId && this.connection) {
+        try {
+          await this.updateImportLogEntry('failed');
+        } catch (logError) {
+          await this.logger.error('Failed to update import log', logError);
+        }
+      }
       throw error;
     } finally {
       // Cleanup
@@ -336,11 +464,14 @@ async function main() {
   const logger = new Logger();
 
   try {
+    // Ensure logs directory exists
+    await logger.ensureLogsDir();
+
     // Check command line arguments
     const args = process.argv.slice(2);
 
     if (args.length === 0) {
-      await logger.error('Usage: node import-data.js <path-to-zip-file>');
+      await logger.error('Usage: node import-data.cjs <path-to-zip-file>');
       process.exit(1);
     }
 

@@ -17,7 +17,7 @@ import auth from './auth.js';
 import dataSources from './data-sources.js';
 import harvestSchedule from './harvest-schedule.js';
 import harvest from './harvest.js';
-import scripts from './scripts.js';
+import scripts, { publicRouter as scriptsPublic } from './scripts.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -80,6 +80,9 @@ router.use('/v1/auth', auth);
 // Public file downloads (bez auth pro direct links v prohlížeči)
 import resultsPublic from './results-public.js';
 router.use('/v1/results-public', resultsPublic);
+
+// Public scripts download (bez auth pro direct links)
+router.use('/v1/scripts', scriptsPublic);
 
 // Všechny ostatní v1 routes vyžadují autentifikaci
 router.use('/v1/categories', authenticateToken, categoriesTree);

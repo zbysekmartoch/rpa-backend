@@ -12,6 +12,7 @@ const __dirname = path.dirname(__filename);
 const SCRIPTS_ROOT = path.resolve(__dirname, '../../scripts');
 
 const router = Router();
+const publicRouter = Router(); // Router for public endpoints without auth
 
 /**
  * Bezpečná validace cesty - zamezí path traversal
@@ -73,6 +74,7 @@ async function listFiles(dirPath, relativeTo = '', maxDepth = 2, currentDepth = 
         } else if (entry.isFile()) {
           // Přidej soubor
           const ext = path.extname(entry.name).toLowerCase();
+          if (!['.doc','.docx','.xls','.xlsx','.js','.cjs', '.py', '.txt', '.md', '.json', '.workflow', '.sql', '.sh', '.css', '.html', '.xml', '.yaml'].includes(ext)) continue; // Filtr přípon
           items.push({
             name: entry.name,
             path: relativePath,
@@ -80,7 +82,7 @@ async function listFiles(dirPath, relativeTo = '', maxDepth = 2, currentDepth = 
             extension: ext,
             size: stats.size,
             mtime: stats.mtime.toISOString(),
-            isText: ['.js', '.py', '.txt', '.md', '.json', '.workflow', '.sql', '.sh', '.css', '.html', '.xml', '.yaml', '.yml', '.env'].includes(ext)
+            isText: ['.js','.cjs', '.py', '.txt', '.md', '.json', '.workflow', '.sql', '.sh', '.css', '.html', '.xml', '.yaml', '.yml', '.env'].includes(ext)
           });
         }
       } catch (err) {
@@ -133,10 +135,10 @@ router.get('/', async (req, res, next) => {
 
 /**
  * GET /api/v1/scripts/download
- * Stáhne konkrétní soubor
- * Query: ?file=analyzy/script.py (povinné)
+ * Download specific file (PUBLIC - no auth required for direct links)
+ * Query: ?file=analyzy/script.py (required)
  */
-router.get('/download', async (req, res, next) => {
+publicRouter.get('/download', async (req, res, next) => {
   try {
     const { file } = req.query;
     
@@ -360,3 +362,4 @@ router.delete('/', async (req, res, next) => {
 });
 
 export default router;
+export { publicRouter };
