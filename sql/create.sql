@@ -117,6 +117,7 @@ CREATE TABLE `result` (
   `output` varchar(255) DEFAULT '',
   `report` text,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `completed_at` datetime DEFAULT NULL COMMENT 'Timestamp when the result was finisjed - completed or failed',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=36 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
 ;

@@ -34,7 +34,8 @@ try {
       ".py": { command: "python", description: "Python scripts" },
       ".js": { command: "node", description: "Node.js scripts" },
       ".r": { command: "Rscript", description: "R scripts" },
-      ".R": { command: "Rscript", description: "R scripts" }
+      ".R": { command: "Rscript", description: "R scripts" },
+      ".sh": { command: "bash", description: "Shell scripts" }
     },
     logging: {
       logFileName: "analysis.log",
@@ -150,7 +151,7 @@ router.post('/', async (req, res, next) => {
 
     const settingsText = toSettingsText(settings);
 
-    const [r] = await query(
+    const r = await query(
       `INSERT INTO analysis (name, settings) VALUES (?, ?)`,
       [String(name).trim(), settingsText]
     );
@@ -230,7 +231,7 @@ router.delete('/:id', async (req, res, next) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id' });
 
-    const [r] = await pool.query(`DELETE FROM analysis WHERE id = ?`, [id]);
+    const r = await query(`DELETE FROM analysis WHERE id = ?`, [id]);
     if (r.affectedRows === 0) return res.status(404).json({ error: 'Not found' });
 
     res.status(204).end();
@@ -284,14 +285,157 @@ router.post('/:id/run', async (req, res, next) => {
 });
 
 
+/**
+ * Načte kroky workflow ze settings.workflow
+ * - Pokud je pole, použije ho přímo
+ * - Pokud je víceřádkový string, rozdělí na řádky
+ * - Pokud je jednořádkový string, načte soubor scripts/{workflow}.workflow
+ * @param {string|string[]} workflow - Hodnota settings.workflow
+ * @returns {Promise<string[]>} - Pole kroků (včetně zakomentovaných, odfiltrované pouze prázdné)
+ */
+async function resolveWorkflowSteps(workflow) {
+  if (!workflow) return [];
+  
+  let steps;
+  
+  if (Array.isArray(workflow)) {
+    // Pole - použít přímo
+    steps = workflow.map(s => String(s).trim());
+  } else {
+    const workflowStr = String(workflow).trim();
+    
+    // Zkontrolovat, zda je to víceřádkový string nebo jednořádkový (název souboru)
+    if (workflowStr.includes('\n')) {
+      // Víceřádkový string - rozdělit na řádky
+      steps = workflowStr.split('\n').map(s => s.trim());
+    } else if (workflowStr) {
+      // Jednořádkový string - název .workflow souboru
+      const workflowFilePath = path.join(BACKEND_DIR, config.paths.scripts, `${workflowStr}.workflow`);
+      try {
+        const workflowContent = await fs.readFile(workflowFilePath, 'utf-8');
+        steps = workflowContent.split('\n').map(s => s.trim());
+      } catch (err) {
+        console.error(`Failed to load workflow file ${workflowFilePath}:`, err.message);
+        // Zkusit jako přímý krok (zpětná kompatibilita)
+        steps = [workflowStr];
+      }
+    } else {
+      steps = [];
+    }
+  }
+  
+  // Odfiltrovat pouze prázdné řádky (komentáře ponechat - filtrují se až před prováděním)
+  return steps.filter(s => s);
+}
+
+/**
+ * Společná logika pro spuštění workflow kroků
+ * @param {Object} options
+ * @param {number} options.resultId - ID výsledku
+ * @param {string[]} options.steps - Pole kroků workflow (včetně zakomentovaných)
+ * @param {string} options.resultDir - Cesta ke složce s výsledky
+ * @param {string} options.logFile - Cesta k log souboru
+ * @param {string} options.errorFile - Cesta k error souboru
+ * @param {string} options.logPrefix - Prefix pro logy (např. "[DEBUG] ")
+ * @returns {Promise<boolean>} - true pokud úspěšně, false pokud selhalo
+ */
+async function executeWorkflowSteps({ resultId, steps, resultDir, logFile, errorFile, logPrefix = '' }) {
+  // Odfiltrovat komentáře (začínající #) před prováděním
+  const activeSteps = (steps || []).filter(s => !s.startsWith('#'));
+  const progressFile = path.join(resultDir, 'progress.json');
+  const analysisStartTime = new Date().toISOString();
+  
+  // Pomocná funkce pro zápis progress
+  async function writeProgress(currentStep, stepName, stepStartTime, status = 'running') {
+    const progress = {
+      status,
+      totalSteps: activeSteps.length,
+      currentStep,
+      currentStepName: stepName,
+      stepStartedAt: stepStartTime,
+      analysisStartedAt: analysisStartTime,
+      updatedAt: new Date().toISOString()
+    };
+    await fs.writeFile(progressFile, JSON.stringify(progress, null, 2));
+  }
+  
+  if (activeSteps.length) {
+    for (let i = 0; i < activeSteps.length; i++) {
+      const step = activeSteps[i];
+      const stepStartTime = new Date().toISOString();
+      
+      // Zapíšeme progress před spuštěním kroku
+      await writeProgress(i + 1, step, stepStartTime, 'running');
+      
+      console.log(`${logPrefix}Executing step: ${step}`);
+      const success = await runScript(step, resultDir, logFile, errorFile);
+      
+      if (!success) {
+        // Zapíšeme failed progress
+        await writeProgress(i + 1, step, stepStartTime, 'failed');
+        
+        await query(
+          'UPDATE result SET status = ?, completed_at = NOW() WHERE id = ?',
+          ['failed', resultId]
+        );
+        
+        // Zapíšeme chybu do log souboru
+        const failTimestamp = new Date().toISOString();
+        const failSeparator = config.logging.separatorChar.repeat(config.logging.separatorLength);
+        const failMsg = `\n${failSeparator}\n[${failTimestamp}] ${logPrefix}ANALYSIS FAILED at step: ${step}\n${failSeparator}\n`;
+        await fs.appendFile(logFile, failMsg);
+        await fs.appendFile(errorFile, failMsg);
+        
+        return false;
+      }
+    }
+  }
+  
+  // Vše proběhlo úspěšně - zapíšeme completed progress
+  const completedProgress = {
+    status: 'completed',
+    totalSteps: activeSteps.length,
+    currentStep: activeSteps.length,
+    currentStepName: activeSteps.length > 0 ? activeSteps[activeSteps.length - 1] : null,
+    stepStartedAt: null,
+    analysisStartedAt: analysisStartTime,
+    completedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  await fs.writeFile(progressFile, JSON.stringify(completedProgress, null, 2));
+  
+  await query(
+    'UPDATE result SET status = ?, completed_at = NOW() WHERE id = ?',
+    ['completed', resultId]
+  );
+  
+  // Zapíšeme úspěch do log souboru
+  const completedTimestamp = new Date().toISOString();
+  const successSeparator = config.logging.separatorChar.repeat(config.logging.separatorLength);
+  const successMsg = `\n${successSeparator}\n[${completedTimestamp}] ${logPrefix}ANALYSIS COMPLETED SUCCESSFULLY\nResult ID: ${resultId}\nTotal steps executed: ${activeSteps.length}\n${successSeparator}\n`;
+  await fs.appendFile(logFile, successMsg);
+  await fs.appendFile(errorFile, successMsg);
+  
+  return true;
+}
+
 async function runAnalysis(analysisId, settings) {
   let resultId = null;
   try {
-    // Simulace dlouho běžící úlohy
     console.log('Running analysis with settings:', settings);
+    
+    // Resolvneme workflow do pole kroků (včetně zakomentovaných)
+    const resolvedSteps = await resolveWorkflowSteps(settings?.workflow);
+    
+    // Připravíme settings s resolvnutým workflow jako pole
+    const settingsForStorage = {
+      ...settings,
+      workflow: resolvedSteps
+    };
+    
     const r = await query(
       'INSERT INTO result(analysis_id, status) VALUES (?, ?)',
-      [analysisId,'pending']
+      [analysisId, 'pending']
     );
     resultId = r.insertId;
 
@@ -299,10 +443,10 @@ async function runAnalysis(analysisId, settings) {
     const resultDir = path.join(BACKEND_DIR, config.paths.results, resultId.toString());
     await fs.mkdir(resultDir, { recursive: true });
 
-    // Uložíme settings do data.json
+    // Uložíme settings s resolvnutým workflow do data.json
     await fs.writeFile(
       path.join(resultDir, 'data.json'),
-      JSON.stringify(settings, null, 2)
+      JSON.stringify(settingsForStorage, null, 2)
     );
 
     // Vytvoříme log soubory
@@ -317,43 +461,8 @@ async function runAnalysis(analysisId, settings) {
     await fs.writeFile(logFile, analysisHeader);
     await fs.writeFile(errorFile, analysisHeader);
 
-    let workflow = settings?.workflow||'';
-    let steps=workflow.split('\n').map(s=>s.trim()).filter(s=>s);
-    if (steps.length) {
-      for (const step of steps) {
-        console.log(`Executing step: ${step} `);
-        const success = await runScript(step, resultDir, logFile, errorFile);
-        
-        if (!success) {
-          await query(
-            'UPDATE result SET status = ? WHERE id = ?',
-            ['failed', resultId]
-          );
-          
-          // Zapíšeme chybu do log souboru
-          const failTimestamp = new Date().toISOString();
-          const failSeparator = config.logging.separatorChar.repeat(config.logging.separatorLength);
-          const failMsg = `\n${failSeparator}\n[${failTimestamp}] ANALYSIS FAILED at step: ${step}\n${failSeparator}\n`;
-          await fs.appendFile(logFile, failMsg);
-          await fs.appendFile(errorFile, failMsg);
-          
-          return;
-        }
-      }
-    }
-
-    // Vše proběhlo úspěšně
-    await query(
-        'UPDATE result SET status = ? WHERE id = ?',
-        ['completed', resultId]
-      );
-      
-    // Zapíšeme úspěch do log souboru
-    const completedTimestamp = new Date().toISOString();
-    const successSeparator = config.logging.separatorChar.repeat(config.logging.separatorLength);
-    const successMsg = `\n${successSeparator}\n[${completedTimestamp}] ANALYSIS COMPLETED SUCCESSFULLY\nResult ID: ${resultId}\nTotal steps executed: ${steps.length}\n${successSeparator}\n`;
-    await fs.appendFile(logFile, successMsg);
-    await fs.appendFile(errorFile, successMsg);
+    // Spustíme workflow kroky
+    await executeWorkflowSteps({ resultId, steps: resolvedSteps, resultDir, logFile, errorFile });
     
   } catch (error) {
     console.error('Analysis failed:', error);
@@ -364,10 +473,8 @@ async function runAnalysis(analysisId, settings) {
         'UPDATE result SET status = ? WHERE id = ?',
         ['failed', resultId]
       );
-    }
-    
-    // Zapíšeme systémovou chybu do log souboru
-    if (resultId) {
+      
+      // Zapíšeme systémovou chybu do log souboru
       const errorTimestamp = new Date().toISOString();
       const errorSeparator = config.logging.separatorChar.repeat(config.logging.separatorLength);
       const errorMsg = `\n${errorSeparator}\n[${errorTimestamp}] SYSTEM ERROR: ${error.message}\nStack: ${error.stack}\n${errorSeparator}\n`;
@@ -383,7 +490,80 @@ async function runAnalysis(analysisId, settings) {
       }
     }
   }
-}   
+}
+
+/**
+ * Spustí analýzu v debug režimu - používá existující result a jeho data.json
+ * Nevytváří nový záznam v DB ani novou složku, jen aktualizuje logy
+ * @param {number} resultId - ID existujícího výsledku
+ */
+async function runDebugAnalysis(resultId) {
+  try {
+    console.log('Running debug analysis for result:', resultId);
+    
+    // Nastavíme status na pending
+    await query(
+      'UPDATE result SET status = ? WHERE id = ?',
+      ['pending', resultId]
+    );
+
+    // Cesta k existující složce s výsledky
+    const resultDir = path.join(BACKEND_DIR, config.paths.results, resultId.toString());
+    
+    // Načteme settings z existujícího data.json
+    const dataJsonPath = path.join(resultDir, 'data.json');
+    let settings;
+    try {
+      const dataContent = await fs.readFile(dataJsonPath, 'utf-8');
+      settings = JSON.parse(dataContent);
+    } catch (err) {
+      console.error('Failed to read data.json:', err);
+      await query(
+        'UPDATE result SET status = ?, completed_at = NOW() WHERE id = ?',
+        ['failed', resultId]
+      );
+      return;
+    }
+
+    // Vytvoříme nové log soubory (přepíšeme staré)
+    const logFile = path.join(resultDir, config.logging.logFileName);
+    const errorFile = path.join(resultDir, config.logging.errorFileName);
+    
+    // Inicializujeme log soubory s hlavičkou (DEBUG režim)
+    const startTimestamp = new Date().toISOString();
+    const separator = config.logging.separatorChar.repeat(config.logging.separatorLength);
+    const analysisHeader = `[DEBUG MODE] Analysis Execution Log - Result ID: ${resultId}\nStarted: ${startTimestamp}\n${separator}\n\n`;
+    
+    await fs.writeFile(logFile, analysisHeader);
+    await fs.writeFile(errorFile, analysisHeader);
+
+    // Spustíme workflow kroky s debug prefixem (workflow je už pole v data.json)
+    await executeWorkflowSteps({ resultId, steps: settings.workflow, resultDir, logFile, errorFile, logPrefix: '[DEBUG] ' });
+    
+  } catch (error) {
+    console.error('Debug analysis failed:', error);
+    
+    await query(
+      'UPDATE result SET status = ? WHERE id = ?',
+      ['failed', resultId]
+    );
+    
+    // Zapíšeme systémovou chybu do log souboru
+    const errorTimestamp = new Date().toISOString();
+    const errorSeparator = config.logging.separatorChar.repeat(config.logging.separatorLength);
+    const errorMsg = `\n${errorSeparator}\n[${errorTimestamp}] [DEBUG] SYSTEM ERROR: ${error.message}\nStack: ${error.stack}\n${errorSeparator}\n`;
+    const resultDir = path.join(BACKEND_DIR, config.paths.results, resultId.toString());
+    const logFile = path.join(resultDir, config.logging.logFileName);
+    const errorFile = path.join(resultDir, config.logging.errorFileName);
+    
+    try {
+      await fs.appendFile(logFile, errorMsg);
+      await fs.appendFile(errorFile, errorMsg);
+    } catch (logError) {
+      console.error('Failed to write error to log files:', logError);
+    }
+  }
+}
 
 function isBareCommand(p) {
   return typeof p === "string" && !p.includes("/") && !p.includes("\\");
@@ -473,3 +653,4 @@ async function runScript(scriptPath, workDir, logFile, errorFile) {
 
 
 export default router;
+export { runAnalysis, runDebugAnalysis, config };

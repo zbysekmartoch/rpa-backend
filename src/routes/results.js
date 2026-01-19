@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import archiver from 'archiver';
+import { runDebugAnalysis } from './analyses.js';
 
 // Získáme absolutní cestu k backend složce
 const __filename = fileURLToPath(import.meta.url);
@@ -64,7 +65,7 @@ router.get('/:id', async (req, res, next) => {
     const rows = await query(
       `
       SELECT r.id, r.analysis_id, r.status, r.created_at, r.output,
-             a.name as analysisName, r.report
+             a.name as analysisName, r.report, r.completed_at
       FROM result r
       LEFT JOIN analysis a ON a.id = r.analysis_id
       WHERE r.id = ?
@@ -86,8 +87,30 @@ router.get('/:id', async (req, res, next) => {
       }
     }
 
-    // Načti seznam DOCX a XLSX souborů z results složky
+    // Načti progress informace pokud analýza běží
     const resultDir = path.join(BACKEND_DIR, 'results', id.toString());
+    result.progress = null;
+    
+    try {
+      const progressPath = path.join(resultDir, 'progress.json');
+      const progressContent = await fs.readFile(progressPath, 'utf-8');
+      const progress = JSON.parse(progressContent);
+      
+      // Dopočítej doby běhu
+      const now = new Date();
+      if (progress.analysisStartedAt) {
+        progress.analysisElapsedMs = now - new Date(progress.analysisStartedAt);
+      }
+      if (progress.stepStartedAt && progress.status === 'running') {
+        progress.stepElapsedMs = now - new Date(progress.stepStartedAt);
+      }
+      
+      result.progress = progress;
+    } catch {
+      // progress.json neexistuje nebo není validní - to je OK
+    }
+
+    // Načti seznam DOCX a XLSX souborů z results složky
     result.files = [];
     
     try {
@@ -128,6 +151,47 @@ router.get('/:id', async (req, res, next) => {
     }
 
     res.json(result);
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * GET /api/v1/results/:id/log
+ * Returns plain text log from analysis.log file
+ */
+router.get('/:id/log', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: 'Invalid id' });
+    }
+
+    // Verify result exists
+    const rows = await query(
+      `SELECT id FROM result WHERE id = ?`,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Result not found' });
+    }
+
+    const logFilePath = path.join(BACKEND_DIR, 'results', id.toString(), 'analysis.log');
+    
+    // Check if log file exists
+    try {
+      await fs.access(logFilePath);
+    } catch {
+      return res.status(404).json({ error: 'Log file not found' });
+    }
+
+    // Read and return log file as plain text
+    const logContent = await fs.readFile(logFilePath, 'utf-8');
+    
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.send(logContent);
+
   } catch (e) {
     next(e);
   }
@@ -181,6 +245,60 @@ router.get('/:id/download', async (req, res, next) => {
 
     // Dokončím archiv
     await archive.finalize();
+
+  } catch (e) {
+    next(e);
+  }
+});
+
+/**
+ * POST /api/v1/results/:id/debug
+ * Spustí analýzu v debug režimu - používá existující result a jeho data.json
+ * Nevytváří nový záznam v DB ani novou složku, jen přepíše logy
+ */
+router.post('/:id/debug', async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ error: 'Invalid id' });
+    }
+
+    // Ověříme že výsledek existuje
+    const rows = await query(
+      'SELECT id, analysis_id FROM result WHERE id = ?',
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Result not found' });
+    }
+
+    // Ověříme že složka s výsledky existuje
+    const resultDir = path.join(BACKEND_DIR, 'results', id.toString());
+    try {
+      await fs.access(resultDir);
+    } catch {
+      return res.status(404).json({ error: 'Result directory not found' });
+    }
+
+    // Ověříme že data.json existuje
+    const dataJsonPath = path.join(resultDir, 'data.json');
+    try {
+      await fs.access(dataJsonPath);
+    } catch {
+      return res.status(404).json({ error: 'data.json not found in result directory' });
+    }
+
+    // Spustíme debug analýzu asynchronně
+    runDebugAnalysis(id);
+
+    res.status(202).json({
+      id: id,
+      analysis_id: rows[0].analysis_id,
+      status: 'pending',
+      mode: 'debug',
+      message: 'Debug analysis started'
+    });
 
   } catch (e) {
     next(e);

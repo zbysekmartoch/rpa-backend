@@ -1,9 +1,10 @@
 // backend/src/routes/scripts.js
+// Správa souborů ve složce scripts - využívá zobecněný file-manager
 import { Router } from 'express';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import multer from 'multer';
+import { getSecurePath, listFiles, createUploadMiddleware } from '../utils/file-manager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,88 +16,6 @@ const router = Router();
 const publicRouter = Router(); // Router for public endpoints without auth
 
 /**
- * Bezpečná validace cesty - zamezí path traversal
- * @param {string} relativePath - Relativní cesta od scripts/
- * @returns {string|null} - Absolutní validní cesta nebo null
- */
-function getSecurePath(relativePath) {
-  if (!relativePath) return SCRIPTS_ROOT;
-  
-  // Normalizuj cestu (odstraň .., ./, redundantní /)
-  const normalized = path.normalize(relativePath).replace(/^(\.\.(\/|\\|$))+/, '');
-  
-  // Vytvoř absolutní cestu
-  const absolute = path.resolve(SCRIPTS_ROOT, normalized);
-  
-  // Ověř že výsledná cesta je pod SCRIPTS_ROOT
-  if (!absolute.startsWith(SCRIPTS_ROOT)) {
-    return null;
-  }
-  
-  return absolute;
-}
-
-/**
- * Rekurzivní výpis souborů a složek
- * @param {string} dirPath - Absolutní cesta k adresáři
- * @param {string} relativeTo - Relativní prefix pro výstup
- * @param {number} maxDepth - Maximální hloubka rekurze
- * @param {number} currentDepth - Aktuální hloubka
- * @returns {Array} - Seznam souborů a složek
- */
-async function listFiles(dirPath, relativeTo = '', maxDepth = 2, currentDepth = 0) {
-  const items = [];
-  
-  if (currentDepth >= maxDepth) return items;
-  
-  try {
-    const entries = await fs.readdir(dirPath, { withFileTypes: true });
-    
-    for (const entry of entries) {
-      const fullPath = path.join(dirPath, entry.name);
-      const relativePath = path.join(relativeTo, entry.name);
-      
-      try {
-        const stats = await fs.stat(fullPath);
-        
-        if (entry.isDirectory()) {
-          // Přidej složku
-          items.push({
-            name: entry.name,
-            path: relativePath,
-            type: 'directory',
-            size: 0,
-            mtime: stats.mtime.toISOString(),
-            children: currentDepth < maxDepth - 1 
-              ? await listFiles(fullPath, relativePath, maxDepth, currentDepth + 1)
-              : []
-          });
-        } else if (entry.isFile()) {
-          // Přidej soubor
-          const ext = path.extname(entry.name).toLowerCase();
-          if (!['.doc','.docx','.xls','.xlsx','.js','.cjs', '.py', '.txt', '.md', '.json', '.workflow', '.sql', '.sh', '.css', '.html', '.xml', '.yaml'].includes(ext)) continue; // Filtr přípon
-          items.push({
-            name: entry.name,
-            path: relativePath,
-            type: 'file',
-            extension: ext,
-            size: stats.size,
-            mtime: stats.mtime.toISOString(),
-            isText: ['.js','.cjs', '.py', '.txt', '.md', '.json', '.workflow', '.sql', '.sh', '.css', '.html', '.xml', '.yaml', '.yml', '.env'].includes(ext)
-          });
-        }
-      } catch (err) {
-        console.warn(`Skipping ${relativePath}: ${err.message}`);
-      }
-    }
-  } catch (err) {
-    throw new Error(`Cannot read directory: ${err.message}`);
-  }
-  
-  return items;
-}
-
-/**
  * GET /api/v1/scripts
  * Vypíše soubory ve složce scripts/ a podadresářích
  * Query: ?subdir=analyzy (volitelné - omezí na podadresář)
@@ -106,7 +25,7 @@ router.get('/', async (req, res, next) => {
     const { subdir } = req.query;
     
     // Validuj cestu
-    const targetPath = getSecurePath(subdir || '');
+    const targetPath = getSecurePath(SCRIPTS_ROOT, subdir || '');
     if (!targetPath) {
       return res.status(400).json({ error: 'Invalid path' });
     }
@@ -147,7 +66,7 @@ publicRouter.get('/download', async (req, res, next) => {
     }
     
     // Validuj cestu
-    const filePath = getSecurePath(file);
+    const filePath = getSecurePath(SCRIPTS_ROOT, file);
     if (!filePath) {
       return res.status(400).json({ error: 'Invalid file path' });
     }
@@ -182,7 +101,7 @@ router.get('/content', async (req, res, next) => {
     }
     
     // Validuj cestu
-    const filePath = getSecurePath(file);
+    const filePath = getSecurePath(SCRIPTS_ROOT, file);
     if (!filePath) {
       return res.status(400).json({ error: 'Invalid file path' });
     }
@@ -224,7 +143,7 @@ router.put('/content', async (req, res, next) => {
     }
     
     // Validuj cestu
-    const filePath = getSecurePath(file);
+    const filePath = getSecurePath(SCRIPTS_ROOT, file);
     if (!filePath) {
       return res.status(400).json({ error: 'Invalid file path' });
     }
@@ -260,61 +179,38 @@ router.put('/content', async (req, res, next) => {
 });
 
 /**
- * Multer config pro upload souborů
- */
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: async (req, file, cb) => {
-      try {
-        const targetPath = req.body.targetPath || '';
-        const dirPath = getSecurePath(targetPath);
-        
-        if (!dirPath) {
-          return cb(new Error('Invalid target path'));
-        }
-        
-        // Vytvoř složku pokud neexistuje
-        await fs.mkdir(dirPath, { recursive: true });
-        
-        cb(null, dirPath);
-      } catch (err) {
-        cb(err);
-      }
-    },
-    filename: (req, file, cb) => {
-      // Použij původní název souboru
-      cb(null, file.originalname);
-    }
-  }),
-  limits: {
-    fileSize: 50 * 1024 * 1024 // 50 MB max
-  }
-});
-
-/**
  * POST /api/v1/scripts/upload
  * Nahraje nový soubor nebo přepíše existující
  * Form data: 
  *   - file: soubor (multipart)
  *   - targetPath: relativní cesta k cílovému adresáři (např. "analyzy")
  */
-router.post('/upload', upload.single('file'), async (req, res, next) => {
+router.post('/upload', async (req, res, next) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
+    // Vytvoř upload middleware pro scripts root
+    const upload = createUploadMiddleware(SCRIPTS_ROOT, 50 * 1024 * 1024);
     
-    const relativePath = path.join(req.body.targetPath || '', req.file.filename);
-    const stats = await fs.stat(req.file.path);
-    
-    res.status(201).json({
-      success: true,
-      file: {
-        name: req.file.filename,
-        path: relativePath,
-        size: stats.size,
-        mtime: stats.mtime.toISOString()
+    upload.single('file')(req, res, async (err) => {
+      if (err) {
+        return next(err);
       }
+      
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded' });
+      }
+      
+      const relativePath = path.join(req.body.targetPath || '', req.file.filename);
+      const stats = await fs.stat(req.file.path);
+      
+      res.status(201).json({
+        success: true,
+        file: {
+          name: req.file.filename,
+          path: relativePath,
+          size: stats.size,
+          mtime: stats.mtime.toISOString()
+        }
+      });
     });
   } catch (err) {
     next(err);
@@ -335,7 +231,7 @@ router.delete('/', async (req, res, next) => {
     }
     
     // Validuj cestu
-    const filePath = getSecurePath(file);
+    const filePath = getSecurePath(SCRIPTS_ROOT, file);
     if (!filePath) {
       return res.status(400).json({ error: 'Invalid file path' });
     }

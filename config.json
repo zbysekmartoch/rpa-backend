@@ -16,6 +16,10 @@
       "command": "node", 
       "description": "Node.js scripts"
     },
+    ".sh": {
+      "command": "bash", 
+      "description": "Shell scripts"
+    },
     ".r": {
       "command": "Rscript",
       "description": "R scripts"

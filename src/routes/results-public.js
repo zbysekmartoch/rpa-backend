@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import { query } from '../db.js';
 import { promises as fs } from 'fs';
+import fsRaw from "fs";
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import archiver from 'archiver';
 
 // Získáme absolutní cestu k backend složce
 const __filename = fileURLToPath(import.meta.url);
@@ -31,10 +33,10 @@ router.get('/:id/files/:filename', async (req, res, next) => {
       return res.status(400).json({ error: 'Invalid filename' });
     }
 
-    // Kontrola přípony - pouze DOCX a XLSX
+    // Kontrola přípony - pouze DOCX a XLSX nebo ZIP
     const ext = path.extname(filename).toLowerCase();
-    if (ext !== '.docx' && ext !== '.xlsx') {
-      return res.status(400).json({ error: 'Only DOCX and XLSX files are allowed' });
+    if (ext !== '.docx' && ext !== '.xlsx' && ext !== '.zip') {
+      return res.status(400).json({ error: 'Only DOCX, XLSX and ZIP files are allowed' });
     }
 
     // Ověř, že výsledek existuje
@@ -49,6 +51,38 @@ router.get('/:id/files/:filename', async (req, res, next) => {
 
     const filePath = path.join(BACKEND_DIR, 'results', id.toString(), filename);
     
+    if (ext === '.zip') {
+      // Zpracování ZIP souboru - pokud neexistuje, vytvoříme ZIP na požádání
+        try {
+            await fs.access(filePath);
+        } catch {
+          const resultDir = path.join(BACKEND_DIR, 'results', id.toString());
+            // Vytvoříme ZIP archiv všech souborů v adresáři výsledku            
+          
+          const output = fsRaw.createWriteStream(filePath);
+          const archive = archiver('zip', {
+            zlib: { level: 9 }
+          });
+
+          output.on('close', () => {
+            console.log(`Created ZIP archive ${filename} (${archive.pointer()} total bytes)`);
+          });
+
+          archive.on('error', (err) => {
+            throw err;
+          });
+
+          archive.pipe(output);
+         // archive.directory(resultDir, false);
+          archive.glob("**/*", {
+            cwd: resultDir,
+            dot: true,
+            ignore: [filename, `**/${filename}`],
+            });
+          await archive.finalize();
+        }       
+    }
+
     // Zkontroluj, že soubor existuje
     try {
       await fs.access(filePath);

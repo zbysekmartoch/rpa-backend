@@ -335,10 +335,17 @@ Smaže soubor.
 **Settings formát:**
 ```json
 {
-  "workflow": "script1.py\nscript2.js\nanalysis.R",
+  "workflow": "full-report",
   "parameters": {...}
 }
 ```
+
+**Workflow může být:**
+- **Název .workflow souboru** (string bez `\n`): `"full-report"` → načte `scripts/full-report.workflow`
+- **Víceřádkový string**: `"script1.py\nscript2.js"` → rozdělí na kroky
+- **Pole kroků**: `["script1.py", "script2.js"]` → použije přímo
+
+**Komentáře:** Řádky začínající `#` jsou ignorovány při provádění, ale zachovány v `data.json`.
 
 **Konfigurace (config.json):**
 - Příkazy pro jednotlivé typy skriptů lze konfigurovat
@@ -351,6 +358,7 @@ Konfigurováno v `config.json`, výchozí:
 - `.py` - Python skripty
 - `.js` - Node.js skripty  
 - `.r`, `.R` - R skripty
+- `.sh` - Shell skripty
 
 **Logging:**
 - Výsledky analýz obsahují detailní logy: `analysis.log` a `analysis.err`
@@ -366,9 +374,17 @@ Správa výsledků analýz včetně stahování jednotlivých souborů nebo cel�
 | Endpoint | Method | Popis | Auth | Query Params | Response |
 |----------|--------|-------|------|--------------|----------|
 | `/` | GET | Seznam výsledků analýz | ✅ | `analysis_id` | `{items}` |
-| `/:id` | GET | Detail výsledku se seznamem souborů | ✅ | - | Výsledek + `files[]` |
+| `/:id` | GET | Detail výsledku s progress a soubory | ✅ | - | Výsledek + `progress` + `files[]` |
 | `/:id` | DELETE | Smazání výsledku (DB + složka) | ✅ | - | `{success, id, message}` |
 | `/:id/download` | GET | Stažení ZIP se všemi výsledky | ✅ | - | ZIP soubor |
+| `/:id/log` | GET | Log analýzy (plain text) | ✅ | - | `text/plain` |
+| `/:id/debug` | POST | Spuštění analýzy v debug režimu | ✅ | - | `{id, status, mode}` |
+| `/:id/files` | GET | Seznam souborů ve složce výsledku | ✅ | `subdir` | `{items}` |
+| `/:id/files/content` | GET | Obsah textového souboru | ✅ | `file` | `{file, content}` |
+| `/:id/files/content` | PUT | Uložení upraveného souboru | ✅ | - | `{success, file}` |
+| `/:id/files/download` | GET | Stažení souboru | ✅/❌ | `file` | File download |
+| `/:id/files/upload` | POST | Nahrání souboru | ✅ | - | `{success, file}` |
+| `/:id/files` | DELETE | Smazání souboru | ✅ | `file` | `{success, file}` |
 
 ### Veřejné stahování souborů
 **Base URL:** `/api/v1/results-public`
@@ -378,7 +394,7 @@ Správa výsledků analýz včetně stahování jednotlivých souborů nebo cel�
 | `/:id/files/:filename` | GET | Stažení konkrétního DOCX/XLSX | ❌ | DOCX/XLSX soubor |
 
 ### GET `/api/v1/results/:id`
-Vrátí detail výsledku analýzy včetně seznamu dostupných DOCX a XLSX souborů.
+Vrátí detail výsledku analýzy včetně progress info a seznamu dostupných DOCX a XLSX souborů.
 
 **Response:**
 ```json
@@ -386,10 +402,22 @@ Vrátí detail výsledku analýzy včetně seznamu dostupných DOCX a XLSX soubo
   "id": 1,
   "analysis_id": 5,
   "analysisName": "Základní analýza",
-  "status": "completed",
+  "status": "running",
   "created_at": "2025-11-10T10:00:00.000Z",
-  "output": "Analysis completed successfully",
+  "completed_at": null,
+  "output": null,
   "report": null,
+  "progress": {
+    "status": "running",
+    "totalSteps": 5,
+    "currentStep": 2,
+    "currentStepName": "analyzy/histogram.py",
+    "stepStartedAt": "2025-11-10T10:02:00.000Z",
+    "stepElapsedMs": 15000,
+    "analysisStartedAt": "2025-11-10T10:00:00.000Z",
+    "analysisElapsedMs": 135000,
+    "updatedAt": "2025-11-10T10:02:00.000Z"
+  },
   "files": [
     {
       "name": "Manažerský výstup.docx",
@@ -397,23 +425,66 @@ Vrátí detail výsledku analýzy včetně seznamu dostupných DOCX a XLSX soubo
       "size": 45678,
       "mtime": "2025-11-10T10:05:00.000Z",
       "downloadUrl": "/api/v1/results-public/1/files/Manažerský%20výstup.docx"
-    },
-    {
-      "name": "Záznam o provedení analýzy.docx",
-      "extension": ".docx",
-      "size": 23456,
-      "mtime": "2025-11-10T10:05:01.000Z",
-      "downloadUrl": "/api/v1/results-public/1/files/Záznam%20o%20provedení%20analýzy.docx"
-    },
-    {
-      "name": "data.xlsx",
-      "extension": ".xlsx",
-      "size": 123456,
-      "mtime": "2025-11-10T10:04:30.000Z",
-      "downloadUrl": "/api/v1/results-public/1/files/data.xlsx"
     }
   ]
 }
+```
+
+**Progress stavy:**
+- `running` - Analýza běží, `stepElapsedMs` ukazuje čas aktuálního kroku
+- `completed` - Všechny kroky dokončeny úspěšně
+- `failed` - Analýza selhala na nějakém kroku
+
+### POST `/api/v1/results/:id/debug`
+Spustí analýzu v debug režimu - použije existující result a jeho data.json.
+Nevytváří nový záznam v DB, jen přepíše logy.
+
+**Response (202):**
+```json
+{
+  "id": 1,
+  "analysis_id": 5,
+  "status": "pending",
+  "mode": "debug",
+  "message": "Debug analysis started"
+}
+```
+
+**Errors:**
+- `404` - Výsledek nenalezen nebo data.json neexistuje
+
+### Správa souborů výsledku
+
+Každý výsledek má svoji složku v `results/{id}/` se soubory.
+
+**GET `/api/v1/results/:id/files`** - Seznam souborů
+```json
+{
+  "root": "",
+  "items": [
+    {"name": "data.json", "type": "file", "extension": ".json", "isText": true},
+    {"name": "img", "type": "directory", "children": [...]}
+  ],
+  "count": 5
+}
+```
+
+**GET `/api/v1/results/:id/files/content?file=data.json`** - Obsah souboru
+```json
+{
+  "file": "data.json",
+  "content": "{\"workflow\": [...]}",
+  "size": 1024,
+  "mtime": "2025-11-10T10:00:00.000Z"
+}
+```
+
+**PUT `/api/v1/results/:id/files/content`** - Uložení souboru
+```json
+// Request
+{"file": "data.json", "content": "{...}"}
+// Response
+{"success": true, "file": "data.json", "size": 1050}
 ```
 
 ### GET `/api/v1/results-public/:id/files/:filename`
