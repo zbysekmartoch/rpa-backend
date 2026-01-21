@@ -76,7 +76,7 @@ npm install
 cd ../..
 ```
 
-Reporter používá vlastní `package.json` pro generování Word dokumentů. Více v [scripts/reports/REPORTER.md](scripts/reports/REPORTER.md).
+Reporter uses its own `package.json` for generating Word documents. More info in [scripts/reports/REPORTER.md](scripts/reports/REPORTER.md).
 
 ### 5. Configure Environment
 ```bash

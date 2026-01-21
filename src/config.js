@@ -21,7 +21,7 @@ export const config = {
   corsOrigins: (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean),
   jwtSecret: process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production',
   
-  // Email konfigurace
+  // Email configuration
   email: {
     host: process.env.EMAIL_HOST || 'smtp.gmail.com',
     port: Number(process.env.EMAIL_PORT || 587),
@@ -33,6 +33,6 @@ export const config = {
     from: process.env.EMAIL_FROM || 'noreply@rpa-backend.com'
   },
   
-  // URL frontendu pro reset linky
+  // Frontend URL for reset links
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173'
 };

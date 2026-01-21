@@ -39,5 +39,9 @@
   "analysis": {
     "defaultTimeout": 300000,
     "maxConcurrentAnalyses": 5
+  },
+  "fileManager": {
+    "defaultDepth": 4,
+    "hiddenFilePrefixes": [".","_","node_modules"]
   }
 }

@@ -1,32 +1,32 @@
 # RPA Backend API Documentation
 
-Kompletní přehled všech API endpointů pro RPA Backend.
+Complete overview of all API endpoints for RPA Backend.
 
-## 🔐 Autentifikace
+## 🔐 Authentication
 **Base URL:** `/api/v1/auth`
 
-| Endpoint | Method | Popis | Auth | Request Body | Response |
-|----------|--------|-------|------|--------------|----------|
-| `/login` | POST | Přihlášení uživatele | ❌ | `{email, password}` | `{token, user}` |
-| `/register` | POST | Registrace nového uživatele | ❌ | `{firstName, lastName, email, password}` | `{message}` |
-| `/me` | GET | Informace o aktuálním uživateli | ✅ | - | `{id, firstName, lastName, email}` |
-| `/reset-password` | POST | Žádost o reset hesla (odešle e-mail) | ❌ | `{email}` | `{message}` |
-| `/reset-password/confirm` | POST | Potvrzení nového hesla s tokenem | ❌ | `{token, newPassword}` | `{message}` |
+| Endpoint | Method | Description | Auth | Request Body | Response |
+|----------|--------|-------------|------|--------------|----------|
+| `/login` | POST | User login | ❌ | `{email, password}` | `{token, user}` |
+| `/register` | POST | Register new user | ❌ | `{firstName, lastName, email, password}` | `{message}` |
+| `/me` | GET | Current user info | ✅ | - | `{id, firstName, lastName, email}` |
+| `/reset-password` | POST | Password reset request (sends email) | ❌ | `{email}` | `{message}` |
+| `/reset-password/confirm` | POST | Confirm new password with token | ❌ | `{token, newPassword}` | `{message}` |
 
-**Reset hesla workflow:**
+**Password reset workflow:**
 
-1. **Žádost o reset:**
+1. **Reset request:**
    ```json
    POST /api/v1/auth/reset-password
    {
      "email": "user@example.com"
    }
    ```
-   - Backend vygeneruje JWT token s 1h expirací
-   - Odešle e-mail s odkazem na frontend
-   - Vždy vrátí success (bezpečnostní opatření)
+   - Backend generates JWT token with 1h expiration
+   - Sends email with link to frontend
+   - Always returns success (security measure)
 
-2. **Potvrzení nového hesla:**
+2. **Confirm new password:**
    ```json
    POST /api/v1/auth/reset-password/confirm
    {
@@ -34,58 +34,58 @@ Kompletní přehled všech API endpointů pro RPA Backend.
      "newPassword": "NewSecurePassword123"
    }
    ```
-   - Backend ověří token
-   - Změní heslo v databázi
-   - Uživatel se může přihlásit s novým heslem
+   - Backend verifies token
+   - Changes password in database
+   - User can login with new password
 
-**Email konfigurace:**
+**Email configuration:**
 
-Pro Gmail:
-- Použij App-Specific Password (vygeneruj v Google Account Security)
+For Gmail:
+- Use App-Specific Password (generate in Google Account Security)
 - EMAIL_HOST=smtp.gmail.com
 - EMAIL_PORT=587
 - EMAIL_SECURE=false
 
-Pro jiné SMTP servery:
-- Nastav EMAIL_HOST, EMAIL_PORT podle poskytovatele
-- EMAIL_SECURE=true pro SSL/TLS (port 465)
+For other SMTP servers:
+- Set EMAIL_HOST, EMAIL_PORT according to provider
+- EMAIL_SECURE=true for SSL/TLS (port 465)
 
-## 📦 Produkty
+## 📦 Products
 **Base URL:** `/api/v1/products`
 
-| Endpoint | Method | Popis | Auth | Query Params | Response |
-|----------|--------|-------|------|--------------|----------|
-| `/` | GET | Seznam produktů s počtem prodejců/cen | ✅ | `category[]`, `mode`, `limit`, `offset` | `{items}` |
+| Endpoint | Method | Description | Auth | Query Params | Response |
+|----------|--------|-------------|------|--------------|----------|
+| `/` | GET | List products with seller/price counts | ✅ | `category[]`, `mode`, `limit`, `offset` | `{items}` |
 
-**Query parametry:**
-- `category[]` - filtr kategorií (lze více hodnot)
-- `mode` - 'subtree' nebo 'exact' (výchozí: 'subtree')
-- `limit` - max 20000 (výchozí: 20000)
-- `offset` - pro stránkování (výchozí: 0)
+**Query parameters:**
+- `category[]` - category filter (multiple values allowed)
+- `mode` - 'subtree' or 'exact' (default: 'subtree')
+- `limit` - max 20000 (default: 20000)
+- `offset` - for pagination (default: 0)
 
-## 🛒 Košíky
+## 🛒 Baskets
 **Base URL:** `/api/v1/baskets`
 
-### Přístupová Pravidla
-- Uživatel vidí **pouze své košíky** (`usr_id` = ID uživatele) + **sdílené košíky** (`usr_id` = 0)
-- Košík s `usr_id = 0` je **sdílený** (viditelný pro všechny uživatele)
-- Uživatel může editovat/mazat pouze **své košíky** nebo **sdílené košíky**
+### Access Rules
+- User sees **only their baskets** (`usr_id` = user ID) + **shared baskets** (`usr_id` = 0)
+- Basket with `usr_id = 0` is **shared** (visible to all users)
+- User can edit/delete only **their baskets** or **shared baskets**
 
-| Endpoint | Method | Popis | Auth | Request Body | Response |
-|----------|--------|-------|------|--------------|----------|
-| `/` | GET | Seznam košíků uživatele + sdílených | ✅ | - | `{items}` |
-| `/` | POST | Vytvoření košíku | ✅ | `{name, usr_id?}` | Nový košík |
-| `/:id` | PUT | Aktualizace košíku | ✅ | `{name?, usr_id?}` | Aktualizovaný košík |
-| `/:id` | DELETE | Smazání košíku | ✅ | - | 204 No Content |
-| `/:id/products` | GET | Produkty v košíku | ✅ | - | `{items}` |
-| `/:id/products` | POST | Přidání produktů do košíku | ✅ | `{productIds: []}` | 204 No Content |
-| `/:id/products/:productId` | DELETE | Odebrání produktu z košíku | ✅ | - | 204 No Content |
+| Endpoint | Method | Description | Auth | Request Body | Response |
+|----------|--------|-------------|------|--------------|----------|
+| `/` | GET | List user's baskets + shared | ✅ | - | `{items}` |
+| `/` | POST | Create basket | ✅ | `{name, usr_id?}` | New basket |
+| `/:id` | PUT | Update basket | ✅ | `{name?, usr_id?}` | Updated basket |
+| `/:id` | DELETE | Delete basket | ✅ | - | 204 No Content |
+| `/:id/products` | GET | Products in basket | ✅ | - | `{items}` |
+| `/:id/products` | POST | Add products to basket | ✅ | `{productIds: []}` | 204 No Content |
+| `/:id/products/:productId` | DELETE | Remove product from basket | ✅ | - | 204 No Content |
 
 ### GET `/api/v1/baskets`
-Vrátí košíky pro přihlášeného uživatele.
+Returns baskets for logged-in user.
 
-**Query parametry:**
-- `search` - fulltext vyhledávání v názvu košíku
+**Query parameters:**
+- `search` - fulltext search in basket name
 
 **Response:**
 ```json
@@ -93,7 +93,7 @@ Vrátí košíky pro přihlášeného uživatele.
   "items": [
     {
       "id": 1,
-      "name": "Můj košík",
+      "name": "My basket",
       "usr_id": 5,
       "created_at": "2025-11-05T10:00:00.000Z",
       "itemCount": 10,
@@ -101,7 +101,7 @@ Vrátí košíky pro přihlášeného uživatele.
     },
     {
       "id": 2,
-      "name": "Sdílený košík",
+      "name": "Shared basket",
       "usr_id": 0,
       "created_at": "2025-11-05T10:00:00.000Z",
       "itemCount": 5,
@@ -112,13 +112,13 @@ Vrátí košíky pro přihlášeného uživatele.
 ```
 
 ### POST `/api/v1/baskets`
-Vytvoří nový košík.
+Creates new basket.
 
 **Request Body:**
 ```json
 {
-  "name": "Název košíku",
-  "usr_id": 0  // Optional: 0 = sdílený, vynechat = vlastní košík
+  "name": "Basket name",
+  "usr_id": 0  // Optional: 0 = shared, omit = own basket
 }
 ```
 
@@ -126,20 +126,20 @@ Vytvoří nový košík.
 ```json
 {
   "id": 3,
-  "name": "Název košíku",
+  "name": "Basket name",
   "usr_id": 0,
   "isShared": true
 }
 ```
 
 ### PUT `/api/v1/baskets/:id`
-Aktualizuje košík (pouze vlastní nebo sdílené).
+Updates basket (only own or shared).
 
 **Request Body:**
 ```json
 {
-  "name": "Nový název",      // Optional
-  "usr_id": 0                // Optional: změna vlastnictví
+  "name": "New name",      // Optional
+  "usr_id": 0              // Optional: change ownership
 }
 ```
 
@@ -147,41 +147,41 @@ Aktualizuje košík (pouze vlastní nebo sdílené).
 ```json
 {
   "id": 3,
-  "name": "Nový název",
+  "name": "New name",
   "usr_id": 0,
   "isShared": true
 }
 ```
 
 **Errors:**
-- `403` - Nemáte oprávnění editovat tento košík
-- `404` - Košík nenalezen
+- `403` - You don't have permission to edit this basket
+- `404` - Basket not found
 
-## � Správa Skriptů
+## 📝 Scripts Management
 **Base URL:** `/api/v1/scripts`
 
-Umožňuje správu souborů ve složce `scripts/` a podadresářích pro interní administraci.
+Enables management of files in `scripts/` folder and subdirectories for internal administration.
 
-### Bezpečnost
-- ✅ Všechny endpointy vyžadují autentifikaci
-- ✅ Striktní omezení na `scripts/` složku
-- ✅ Path traversal protection (`.., absolutní cesty`)
-- ✅ Validace všech cest pomocí `path.resolve()`
+### Security
+- ✅ All endpoints require authentication
+- ✅ Strict restriction to `scripts/` folder
+- ✅ Path traversal protection (`.., absolute paths`)
+- ✅ All paths validated using `path.resolve()`
 
-| Endpoint | Method | Popis | Auth | Request | Response |
-|----------|--------|-------|------|---------|----------|
-| `/` | GET | Výpis souborů a složek | ✅ | `?subdir=analyzy` | `{root, items[], count}` |
-| `/download` | GET | Stažení souboru | ✅ | `?file=analyzy/script.py` | File download |
-| `/content` | GET | Načtení obsahu textového souboru | ✅ | `?file=analyzy/script.py` | `{file, content, size, mtime}` |
-| `/content` | PUT | Uložení změn textového souboru | ✅ | `{file, content}` | `{success, file, size, mtime}` |
-| `/upload` | POST | Nahrání nového souboru | ✅ | FormData: `file`, `targetPath` | `{success, file{...}}` |
-| `/` | DELETE | Smazání souboru | ✅ | `?file=analyzy/script.py` | `{success, file}` |
+| Endpoint | Method | Description | Auth | Request | Response |
+|----------|--------|-------------|------|---------|----------|
+| `/` | GET | List files and folders | ✅ | `?subdir=analyzy` | `{root, items[], count}` |
+| `/download` | GET | Download file | ✅ | `?file=analyzy/script.py` | File download |
+| `/content` | GET | Load text file content | ✅ | `?file=analyzy/script.py` | `{file, content, size, mtime}` |
+| `/content` | PUT | Save text file changes | ✅ | `{file, content}` | `{success, file, size, mtime}` |
+| `/upload` | POST | Upload new file | ✅ | FormData: `file`, `targetPath` | `{success, file{...}}` |
+| `/` | DELETE | Delete file | ✅ | `?file=analyzy/script.py` | `{success, file}` |
 
 ### GET `/api/v1/scripts`
-Vypíše soubory ve složce `scripts/` (až 2 úrovně hloubky).
+Lists files in `scripts/` folder (up to 2 levels deep).
 
-**Query parametry:**
-- `subdir` - Omezí výpis na podadresář (např. `analyzy`, `reports`)
+**Query parameters:**
+- `subdir` - Limit listing to subdirectory (e.g., `analyzy`, `reports`)
 
 **Response:**
 ```json
@@ -210,10 +210,10 @@ Vypíše soubory ve složce `scripts/` (až 2 úrovně hloubky).
 }
 ```
 
-**Textové přípony:** `.js`, `.py`, `.txt`, `.md`, `.json`, `.workflow`, `.sql`, `.sh`, `.css`, `.html`, `.xml`, `.yaml`, `.yml`, `.env`
+**Text extensions:** `.js`, `.py`, `.txt`, `.md`, `.json`, `.workflow`, `.sql`, `.sh`, `.css`, `.html`, `.xml`, `.yaml`, `.yml`, `.env`
 
 ### GET `/api/v1/scripts/download`
-Stáhne konkrétní soubor (binární i textový).
+Downloads specific file (binary or text).
 
 **Query:**
 ```
@@ -223,7 +223,7 @@ Stáhne konkrétní soubor (binární i textový).
 **Response:** File download (attachment)
 
 ### GET `/api/v1/scripts/content`
-Načte obsah textového souboru (UTF-8).
+Loads text file content (UTF-8).
 
 **Query:**
 ```
@@ -241,7 +241,7 @@ Načte obsah textového souboru (UTF-8).
 ```
 
 ### PUT `/api/v1/scripts/content`
-Uloží změny v textovém souboru (pouze existující soubory).
+Saves changes to text file (existing files only).
 
 **Request Body:**
 ```json
@@ -262,14 +262,14 @@ Uloží změny v textovém souboru (pouze existující soubory).
 ```
 
 **Errors:**
-- `404` - Soubor nenalezen (pro vytvoření nových použij upload)
+- `404` - File not found (use upload for creating new files)
 
 ### POST `/api/v1/scripts/upload`
-Nahraje nový soubor nebo přepíše existující.
+Uploads new file or overwrites existing.
 
 **Request:** `multipart/form-data`
-- `file` - Soubor (max 50 MB)
-- `targetPath` - Relativní cesta k cílovému adresáři (např. `analyzy`)
+- `file` - File (max 50 MB)
+- `targetPath` - Relative path to target directory (e.g., `analyzy`)
 
 **Example (JavaScript):**
 ```javascript
@@ -300,7 +300,7 @@ const response = await fetch('/api/v1/scripts/upload', {
 ```
 
 ### DELETE `/api/v1/scripts`
-Smaže soubor.
+Deletes file.
 
 **Query:**
 ```
@@ -319,20 +319,20 @@ Smaže soubor.
 - `400` - Invalid path, Path traversal attempt
 - `404` - File/Directory not found
 
-## �📊 Analýzy
+## 📊 Analyses
 **Base URL:** `/api/v1/analyses`
 
-| Endpoint | Method | Popis | Auth | Request Body | Response |
-|----------|--------|-------|------|--------------|----------|
-| `/config` | GET | Konfigurace analýz a podporované typy | ✅ | - | `{supportedScriptTypes, paths, logging}` |
-| `/` | GET | Seznam analýz | ✅ | - | `{items}` |
-| `/` | POST | Vytvoření analýzy | ✅ | `{name, settings}` | Nová analýza |
-| `/:id` | GET | Detail analýzy | ✅ | - | Analýza |
-| `/:id` | PUT | Aktualizace analýzy | ✅ | `{name, settings}` | Aktualizovaná analýza |
-| `/:id` | DELETE | Smazání analýzy | ✅ | - | `{success, id}` |
-| `/:id/run` | POST | Spuštění analýzy | ✅ | - | `{message, resultId}` |
+| Endpoint | Method | Description | Auth | Request Body | Response |
+|----------|--------|-------------|------|--------------|----------|
+| `/config` | GET | Analysis configuration and supported types | ✅ | - | `{supportedScriptTypes, paths, logging}` |
+| `/` | GET | List analyses | ✅ | - | `{items}` |
+| `/` | POST | Create analysis | ✅ | `{name, settings}` | New analysis |
+| `/:id` | GET | Analysis detail | ✅ | - | Analysis |
+| `/:id` | PUT | Update analysis | ✅ | `{name, settings}` | Updated analysis |
+| `/:id` | DELETE | Delete analysis | ✅ | - | `{success, id}` |
+| `/:id/run` | POST | Run analysis | ✅ | - | `{message, resultId}` |
 
-**Settings formát:**
+**Settings format:**
 ```json
 {
   "workflow": "full-report",
@@ -340,68 +340,68 @@ Smaže soubor.
 }
 ```
 
-**Workflow může být:**
-- **Název .workflow souboru** (string bez `\n`): `"full-report"` → načte `scripts/full-report.workflow`
-- **Víceřádkový string**: `"script1.py\nscript2.js"` → rozdělí na kroky
-- **Pole kroků**: `["script1.py", "script2.js"]` → použije přímo
+**Workflow can be:**
+- **Name of .workflow file** (string without `\n`): `"full-report"` → loads `scripts/full-report.workflow`
+- **Multi-line string**: `"script1.py\nscript2.js"` → splits into steps
+- **Array of steps**: `["script1.py", "script2.js"]` → uses directly
 
-**Komentáře:** Řádky začínající `#` jsou ignorovány při provádění, ale zachovány v `data.json`.
+**Comments:** Lines starting with `#` are ignored during execution but preserved in `data.json`.
 
-**Konfigurace (config.json):**
-- Příkazy pro jednotlivé typy skriptů lze konfigurovat
-- Cesty k složkám scripts a results
-- Nastavení loggingu (názvy souborů, separátory, atd.)
-- Výchozí timeouty a limity
+**Configuration (config.json):**
+- Commands for individual script types can be configured
+- Paths to scripts and results folders
+- Logging settings (file names, separators, etc.)
+- Default timeouts and limits
 
-**Podporované jazyky skriptů:**
-Konfigurováno v `config.json`, výchozí:
-- `.py` - Python skripty
-- `.js` - Node.js skripty  
-- `.r`, `.R` - R skripty
-- `.sh` - Shell skripty
+**Supported script languages:**
+Configured in `config.json`, default:
+- `.py` - Python scripts
+- `.js` - Node.js scripts  
+- `.r`, `.R` - R scripts
+- `.sh` - Shell scripts
 
 **Logging:**
-- Výsledky analýz obsahují detailní logy: `analysis.log` a `analysis.err`
-- Každý krok workflow je zalogován s timestampem
-- Konfigurovatelné separátory a formáty
-- Automatické zachycení stdout a stderr jednotlivých skriptů
+- Analysis results contain detailed logs: `analysis.log` and `analysis.err`
+- Each workflow step is logged with timestamp
+- Configurable separators and formats
+- Automatic capture of stdout and stderr from individual scripts
 
-## 📁 Výsledky
+## 📁 Results
 **Base URL:** `/api/v1/results`
 
-Správa výsledků analýz včetně stahování jednotlivých souborů nebo celého ZIP archivu.
+Management of analysis results including downloading individual files or entire ZIP archive.
 
-| Endpoint | Method | Popis | Auth | Query Params | Response |
-|----------|--------|-------|------|--------------|----------|
-| `/` | GET | Seznam výsledků analýz | ✅ | `analysis_id` | `{items}` |
-| `/:id` | GET | Detail výsledku s progress a soubory | ✅ | - | Výsledek + `progress` + `files[]` |
-| `/:id` | DELETE | Smazání výsledku (DB + složka) | ✅ | - | `{success, id, message}` |
-| `/:id/download` | GET | Stažení ZIP se všemi výsledky | ✅ | - | ZIP soubor |
-| `/:id/log` | GET | Log analýzy (plain text) | ✅ | - | `text/plain` |
-| `/:id/debug` | POST | Spuštění analýzy v debug režimu | ✅ | - | `{id, status, mode}` |
-| `/:id/files` | GET | Seznam souborů ve složce výsledku | ✅ | `subdir` | `{items}` |
-| `/:id/files/content` | GET | Obsah textového souboru | ✅ | `file` | `{file, content}` |
-| `/:id/files/content` | PUT | Uložení upraveného souboru | ✅ | - | `{success, file}` |
-| `/:id/files/download` | GET | Stažení souboru | ✅/❌ | `file` | File download |
-| `/:id/files/upload` | POST | Nahrání souboru | ✅ | - | `{success, file}` |
-| `/:id/files` | DELETE | Smazání souboru | ✅ | `file` | `{success, file}` |
+| Endpoint | Method | Description | Auth | Query Params | Response |
+|----------|--------|-------------|------|--------------|----------|
+| `/` | GET | List analysis results | ✅ | `analysis_id` | `{items}` |
+| `/:id` | GET | Result detail with progress and files | ✅ | - | Result + `progress` + `files[]` |
+| `/:id` | DELETE | Delete result (DB + folder) | ✅ | - | `{success, id, message}` |
+| `/:id/download` | GET | Download ZIP with all results | ✅ | - | ZIP file |
+| `/:id/log` | GET | Analysis log (plain text) | ✅ | - | `text/plain` |
+| `/:id/debug` | POST | Run analysis in debug mode | ✅ | - | `{id, status, mode}` |
+| `/:id/files` | GET | List files in result folder | ✅ | `subdir` | `{items}` |
+| `/:id/files/content` | GET | Text file content | ✅ | `file` | `{file, content}` |
+| `/:id/files/content` | PUT | Save modified file | ✅ | - | `{success, file}` |
+| `/:id/files/download` | GET | Download file | ✅/❌ | `file` | File download |
+| `/:id/files/upload` | POST | Upload file | ✅ | - | `{success, file}` |
+| `/:id/files` | DELETE | Delete file | ✅ | `file` | `{success, file}` |
 
-### Veřejné stahování souborů
+### Public File Download
 **Base URL:** `/api/v1/results-public`
 
-| Endpoint | Method | Popis | Auth | Response |
-|----------|--------|-------|------|----------|
-| `/:id/files/:filename` | GET | Stažení konkrétního DOCX/XLSX | ❌ | DOCX/XLSX soubor |
+| Endpoint | Method | Description | Auth | Response |
+|----------|--------|-------------|------|----------|
+| `/:id/files/:filename` | GET | Download specific DOCX/XLSX | ❌ | DOCX/XLSX file |
 
 ### GET `/api/v1/results/:id`
-Vrátí detail výsledku analýzy včetně progress info a seznamu dostupných DOCX a XLSX souborů.
+Returns analysis result detail including progress info and list of available DOCX and XLSX files.
 
 **Response:**
 ```json
 {
   "id": 1,
   "analysis_id": 5,
-  "analysisName": "Základní analýza",
+  "analysisName": "Basic analysis",
   "status": "running",
   "created_at": "2025-11-10T10:00:00.000Z",
   "completed_at": null,
@@ -420,24 +420,24 @@ Vrátí detail výsledku analýzy včetně progress info a seznamu dostupných D
   },
   "files": [
     {
-      "name": "Manažerský výstup.docx",
+      "name": "Manager output.docx",
       "extension": ".docx",
       "size": 45678,
       "mtime": "2025-11-10T10:05:00.000Z",
-      "downloadUrl": "/api/v1/results-public/1/files/Manažerský%20výstup.docx"
+      "downloadUrl": "/api/v1/results-public/1/files/Manager%20output.docx"
     }
   ]
 }
 ```
 
-**Progress stavy:**
-- `running` - Analýza běží, `stepElapsedMs` ukazuje čas aktuálního kroku
-- `completed` - Všechny kroky dokončeny úspěšně
-- `failed` - Analýza selhala na nějakém kroku
+**Progress states:**
+- `running` - Analysis is running, `stepElapsedMs` shows current step time
+- `completed` - All steps completed successfully
+- `failed` - Analysis failed on some step
 
 ### POST `/api/v1/results/:id/debug`
-Spustí analýzu v debug režimu - použije existující result a jeho data.json.
-Nevytváří nový záznam v DB, jen přepíše logy.
+Runs analysis in debug mode - uses existing result and its data.json.
+Does not create new DB record, only overwrites logs.
 
 **Response (202):**
 ```json
@@ -451,13 +451,13 @@ Nevytváří nový záznam v DB, jen přepíše logy.
 ```
 
 **Errors:**
-- `404` - Výsledek nenalezen nebo data.json neexistuje
+- `404` - Result not found or data.json does not exist
 
-### Správa souborů výsledku
+### Result File Management
 
-Každý výsledek má svoji složku v `results/{id}/` se soubory.
+Each result has its own folder in `results/{id}/` with files.
 
-**GET `/api/v1/results/:id/files`** - Seznam souborů
+**GET `/api/v1/results/:id/files`** - File list
 ```json
 {
   "root": "",
@@ -469,7 +469,7 @@ Každý výsledek má svoji složku v `results/{id}/` se soubory.
 }
 ```
 
-**GET `/api/v1/results/:id/files/content?file=data.json`** - Obsah souboru
+**GET `/api/v1/results/:id/files/content?file=data.json`** - File content
 ```json
 {
   "file": "data.json",
@@ -479,7 +479,7 @@ Každý výsledek má svoji složku v `results/{id}/` se soubory.
 }
 ```
 
-**PUT `/api/v1/results/:id/files/content`** - Uložení souboru
+**PUT `/api/v1/results/:id/files/content`** - Save file
 ```json
 // Request
 {"file": "data.json", "content": "{...}"}
@@ -488,11 +488,11 @@ Každý výsledek má svoji složku v `results/{id}/` se soubory.
 ```
 
 ### GET `/api/v1/results-public/:id/files/:filename`
-Stáhne konkrétní DOCX nebo XLSX soubor z výsledku analýzy. **Nevyžaduje autentifikaci** - vhodné pro direct links.
+Downloads specific DOCX or XLSX file from analysis result. **Does not require authentication** - suitable for direct links.
 
-**Parametry:**
-- `id` - ID výsledku
-- `filename` - Název souboru (z `files` pole)
+**Parameters:**
+- `id` - Result ID
+- `filename` - File name (from `files` array)
 
 **Response:**
 - Binary file download
@@ -501,34 +501,34 @@ Stáhne konkrétní DOCX nebo XLSX soubor z výsledku analýzy. **Nevyžaduje au
 - Content-Disposition: `attachment; filename="..."`
 
 **Errors:**
-- `400` - Neplatný filename nebo nepodporovaná přípona
-- `404` - Výsledek nebo soubor neexistuje
+- `400` - Invalid filename or unsupported extension
+- `404` - Result or file does not exist
 
-**Příklad:**
+**Example:**
 ```html
-<!-- Direct link v HTML -->
-<a href="/api/v1/results-public/1/files/Manažerský%20výstup.docx">
-  Stáhnout report
+<!-- Direct link in HTML -->
+<a href="/api/v1/results-public/1/files/Manager%20output.docx">
+  Download report
 </a>
 ```
 
 **JavaScript:**
 ```javascript
-// Použití downloadUrl z files pole
+// Using downloadUrl from files array
 const file = result.files[0];
-window.open(file.downloadUrl); // Funguje bez Bearer tokenu!
+window.open(file.downloadUrl); // Works without Bearer token!
 ```
 
 ### GET `/api/v1/results/:id/download`
-Stáhne všechny soubory z výsledku jako ZIP archiv.
+Downloads all files from result as ZIP archive.
 
 **Response:**
-- ZIP archiv se všemi soubory
+- ZIP archive with all files
 - Content-Type: `application/zip`
 - Content-Disposition: `attachment; filename="result-{id}.zip"`
 
 ### DELETE `/api/v1/results/:id`
-Smaže výsledek analýzy z databáze a odstraní složku s výsledky.
+Deletes analysis result from database and removes result folder.
 
 **Response:**
 ```json
@@ -540,98 +540,98 @@ Smaže výsledek analýzy z databáze a odstraní složku s výsledky.
 ```
 
 **Errors:**
-- `400` - Neplatný ID
-- `404` - Výsledek nenalezen
+- `400` - Invalid ID
+- `404` - Result not found
 
-**Poznámka:** Pokud se nepodaří smazat složku, operace pokračuje a záznam z DB se odstraní.
+**Note:** If folder deletion fails, operation continues and DB record is removed.
 
-## 🤖 Harvestery
+## 🤖 Harvesters
 **Base URL:** `/api/v1/harvesters`
 
-| Endpoint | Method | Popis | Auth | Request Body | Response |
-|----------|--------|-------|------|--------------|----------|
-| `/` | GET | Seznam harvesterů s live statusem | ✅ | - | `{items}` |
-| `/` | POST | Vytvoření harvesteru | ✅ | `{name, host, upload?, download?, ping?}` | Nový harvester |
-| `/:id` | GET | Detail harvesteru | ✅ | - | Harvester |
-| `/:id` | PUT | Aktualizace/vytvoření harvesteru | ✅ | `{name?, host?, upload?, download?, ping?}` | Harvester |
-| `/:id` | DELETE | Smazání harvesteru | ✅ | - | `{success, id}` |
-| `/:id/status` | GET | Live status z harvester API | ✅ | - | Status JSON |
-| `/:id/schedule` | POST | Forward schedule na harvester | ✅ | `{harvestingJobId, urls, cronExpression}` | Response z harvesteru |
-| `/:id/schedule/:jobId` | DELETE | Forward unschedule na harvester | ✅ | - | Response z harvesteru |
-| `/:id/harvest` | POST | Forward okamžitý harvest na harvester | ✅ | `{harvestingJobId}` | Response z harvesteru |
+| Endpoint | Method | Description | Auth | Request Body | Response |
+|----------|--------|-------------|------|--------------|----------|
+| `/` | GET | List harvesters with live status | ✅ | - | `{items}` |
+| `/` | POST | Create harvester | ✅ | `{name, host, upload?, download?, ping?}` | New harvester |
+| `/:id` | GET | Harvester detail | ✅ | - | Harvester |
+| `/:id` | PUT | Update/create harvester | ✅ | `{name?, host?, upload?, download?, ping?}` | Harvester |
+| `/:id` | DELETE | Delete harvester | ✅ | - | `{success, id}` |
+| `/:id/status` | GET | Live status from harvester API | ✅ | - | Status JSON |
+| `/:id/schedule` | POST | Forward schedule to harvester | ✅ | `{harvestingJobId, urls, cronExpression}` | Response from harvester |
+| `/:id/schedule/:jobId` | DELETE | Forward unschedule to harvester | ✅ | - | Response from harvester |
+| `/:id/harvest` | POST | Forward immediate harvest to harvester | ✅ | `{harvestingJobId}` | Response from harvester |
 
-**Poznámky:**
-- `:id` může být číselné ID nebo název harvesteru
-- PUT s názvem vytvoří nový harvester, pokud neexistuje (upsert)
-- Status se získává vždy live z harvester API, ne z databáze
+**Notes:**
+- `:id` can be numeric ID or harvester name
+- PUT with name creates new harvester if it doesn't exist (upsert)
+- Status is always fetched live from harvester API, not from database
 
-## 📡 Datové zdroje
+## 📡 Data Sources
 **Base URL:** `/api/v1/data-sources`
 
-| Endpoint | Method | Popis | Auth | Request Body | Response |
-|----------|--------|-------|------|--------------|----------|
-| `/` | GET | Seznam datových zdrojů | ✅ | - | `{items}` |
-| `/` | POST | Vytvoření datového zdroje | ✅ | `{name, urls}` | Nový datový zdroj |
-| `/:id` | GET | Detail datového zdroje | ✅ | - | Datový zdroj |
-| `/:id` | PUT | Aktualizace datového zdroje | ✅ | `{name?, urls?}` | Aktualizovaný datový zdroj |
-| `/:id` | DELETE | Smazání datového zdroje | ✅ | - | `{success, id}` |
+| Endpoint | Method | Description | Auth | Request Body | Response |
+|----------|--------|-------------|------|--------------|----------|
+| `/` | GET | List data sources | ✅ | - | `{items}` |
+| `/` | POST | Create data source | ✅ | `{name, urls}` | New data source |
+| `/:id` | GET | Data source detail | ✅ | - | Data source |
+| `/:id` | PUT | Update data source | ✅ | `{name?, urls?}` | Updated data source |
+| `/:id` | DELETE | Delete data source | ✅ | - | `{success, id}` |
 
-**URLs formát:**
-- Jako array: `["url1", "url2"]`
-- Jako string: `"url1\nurl2"`
+**URLs format:**
+- As array: `["url1", "url2"]`
+- As string: `"url1\nurl2"`
 
 ## 🕐 Harvest Schedule
 **Base URL:** `/api/v1/harvest-schedule`
 
-| Endpoint | Method | Popis | Auth | Request Body | Response |
-|----------|--------|-------|------|--------------|----------|
-| `/` | GET | Seznam naplánovaných harvest jobů | ✅ | - | `{items}` |
-| `/` | POST | Vytvoření harvest jobu | ✅ | `{harvester_id, datasource_id, cron_expression}` | Nový schedule |
-| `/:id` | GET | Detail harvest jobu | ✅ | - | Schedule |
-| `/:id` | PUT | Aktualizace harvest jobu | ✅ | `{harvester_id?, datasource_id?, cron_expression?}` | Aktualizovaný schedule |
-| `/:id` | DELETE | Smazání harvest jobu | ✅ | - | `{success, id}` |
-| `/import/:id` | POST | Import dat z harvesteru do DB | ✅ | Query/Body params | `{message, scheduleId, status}` |
+| Endpoint | Method | Description | Auth | Request Body | Response |
+|----------|--------|-------------|------|--------------|----------|
+| `/` | GET | List scheduled harvest jobs | ✅ | - | `{items}` |
+| `/` | POST | Create harvest job | ✅ | `{harvester_id, datasource_id, cron_expression}` | New schedule |
+| `/:id` | GET | Harvest job detail | ✅ | - | Schedule |
+| `/:id` | PUT | Update harvest job | ✅ | `{harvester_id?, datasource_id?, cron_expression?}` | Updated schedule |
+| `/:id` | DELETE | Delete harvest job | ✅ | - | `{success, id}` |
+| `/import/:id` | POST | Import data from harvester to DB | ✅ | Query/Body params | `{message, scheduleId, status}` |
 
-**Query parametry (GET):**
-- `harvester_id` - filtr podle harvesteru
-- `datasource_id` - filtr podle datového zdroje
+**Query parameters (GET):**
+- `harvester_id` - filter by harvester
+- `datasource_id` - filter by data source
 
-**Import parametry (POST /import/:id):**
-- `from` - ISO 8601 datetime (např. `2025-10-01T00:00:00Z`) - filtr od data
-- `to` - ISO 8601 datetime (např. `2025-10-31T23:59:59Z`) - filtr do data
-- `screenshots` - boolean - zahrnout price screenshots (`*prices*.png|jpg`)
-- `images` - boolean - zahrnout product images (`product*.jpg|png`)
+**Import parameters (POST /import/:id):**
+- `from` - ISO 8601 datetime (e.g., `2025-10-01T00:00:00Z`) - filter from date
+- `to` - ISO 8601 datetime (e.g., `2025-10-31T23:59:59Z`) - filter to date
+- `screenshots` - boolean - include price screenshots (`*prices*.png|jpg`)
+- `images` - boolean - include product images (`product*.jpg|png`)
 
-**Příklad importu:**
+**Import example:**
 ```bash
 POST /api/v1/harvest-schedule/import/123?from=2025-10-01T00:00:00Z&to=2025-10-31T23:59:59Z&images=true&screenshots=true
 ```
 
 **Import workflow:**
-1. Backend stáhne ZIP z harvesteru: `GET {harvester_host}/export/{scheduleId}?params`
-2. ZIP se uloží do `./temp/harvest_{id}_{timestamp}.zip`
-3. Spustí se import script: `node scripts/import-data.js {zipFile}`
-4. Po dokončení se ZIP soubor smaže
-5. Import běží asynchronně - okamžitá response s `status: 'downloading'`
+1. Backend downloads ZIP from harvester: `GET {harvester_host}/export/{scheduleId}?params`
+2. ZIP is saved to `./temp/harvest_{id}_{timestamp}.zip`
+3. Import script runs: `node scripts/import-data.js {zipFile}`
+4. After completion, ZIP file is deleted
+5. Import runs asynchronously - immediate response with `status: 'downloading'`
 
-**Automatická synchronizace:**
-- POST/PUT automaticky volá harvester API pro vytvoření/aktualizaci jobu
-- DELETE automaticky volá harvester API pro zrušení jobu
-- Import volá harvester export endpoint a zpracuje data
+**Automatic synchronization:**
+- POST/PUT automatically calls harvester API to create/update job
+- DELETE automatically calls harvester API to cancel job
+- Import calls harvester export endpoint and processes data
 
-## � Harvest (Manual Import)
+## 📦 Harvest (Manual Import)
 **Base URL:** `/api/v1/harvest`
 
-| Endpoint | Method | Popis | Auth | Request Body | Response |
-|----------|--------|-------|------|--------------|----------|
-| `/manual-import` | POST | Manuální import dat ze ZIP souboru | ✅ | multipart/form-data | `{message, filename, filesize, status}` |
+| Endpoint | Method | Description | Auth | Request Body | Response |
+|----------|--------|-------------|------|--------------|----------|
+| `/manual-import` | POST | Manual data import from ZIP file | ✅ | multipart/form-data | `{message, filename, filesize, status}` |
 
 **Request:**
 - Content-Type: `multipart/form-data`
-- Body: FormData s polem `file` obsahujícím ZIP soubor
-- Max velikost: 500 MB
+- Body: FormData with `file` field containing ZIP file
+- Max size: 500 MB
 
-**Příklad použití:**
+**Usage example:**
 ```bash
 # cURL
 curl -X POST http://localhost:3000/api/v1/harvest/manual-import \
@@ -662,37 +662,37 @@ const response = await fetch('/api/v1/harvest/manual-import', {
 ```
 
 **Import workflow:**
-1. ZIP soubor se nahraje do `./temp/manual_{timestamp}_{filename}.zip`
-2. Spustí se import script: `node scripts/import-data.js {zipFile}`
-3. Import běží asynchronně - okamžitá response s `status: 'processing'`
-4. Po dokončení se ZIP soubor smaže
-5. Výsledky se logují do konzole
+1. ZIP file is uploaded to `./temp/manual_{timestamp}_{filename}.zip`
+2. Import script runs: `node scripts/import-data.js {zipFile}`
+3. Import runs asynchronously - immediate response with `status: 'processing'`
+4. After completion, ZIP file is deleted
+5. Results are logged to console
 
-## �🔄 Workflows
+## 🔄 Workflows
 **Base URL:** `/api/v1/workflows`
 
-| Endpoint | Method | Popis | Auth | Response |
-|----------|--------|-------|------|----------|
-| `/` | GET | Seznam dostupných workflows | ✅ | `{items: ["name1", "name2"]}` |
-| `/:name` | GET | Obsah konkrétního workflow | ✅ | `{name, content}` |
+| Endpoint | Method | Description | Auth | Response |
+|----------|--------|-------------|------|----------|
+| `/` | GET | List available workflows | ✅ | `{items: ["name1", "name2"]}` |
+| `/:name` | GET | Content of specific workflow | ✅ | `{name, content}` |
 
-**Workflow soubory:**
-- Uložené v `scripts/` jako `.workflow` soubory
-- Obsahují seznam skriptů, jeden na řádek
+**Workflow files:**
+- Stored in `scripts/` as `.workflow` files
+- Contain list of scripts, one per line
 
-## 🌳 Kategorie
+## 🌳 Categories
 **Base URL:** `/api/v1/categories`
 
-| Endpoint | Method | Popis | Auth | Response |
-|----------|--------|-------|------|----------|
-| `/` | GET | Stromová struktura kategorií | ✅ | Strom kategorií |
+| Endpoint | Method | Description | Auth | Response |
+|----------|--------|-------------|------|----------|
+| `/` | GET | Category tree structure | ✅ | Category tree |
 
-## 🔧 Systémové
+## 🔧 System
 **Base URL:** `/api`
 
-| Endpoint | Method | Popis | Auth | Response |
-|----------|--------|-------|------|----------|
-| `/health` | GET | Health check s detaily systému | ❌ | Detailní informace |
+| Endpoint | Method | Description | Auth | Response |
+|----------|--------|-------------|------|----------|
+| `/health` | GET | Health check with system details | ❌ | Detailed information |
 
 **Health Check Response:**
 ```json
@@ -718,66 +718,66 @@ const response = await fetch('/api/v1/harvest/manual-import', {
 }
 ```
 
-**Použití:**
-- Monitoring dostupnosti služby
-- Diagnostika systému
+**Usage:**
+- Service availability monitoring
+- System diagnostics
 - CI/CD health checks
-- Zobrazení verzí a konfigurace
+- Display versions and configuration
 
 ---
 
-## 🔒 Autentifikace
+## 🔒 Authentication
 
-Všechny endpointy označené ✅ vyžadují JWT token v hlavičce:
+All endpoints marked ✅ require JWT token in header:
 ```
 Authorization: Bearer <jwt_token>
 ```
 
-## 📄 Formáty odpovědí
+## 📄 Response Formats
 
-### Úspěšná odpověď
+### Success Response
 ```json
 {
-  "items": [...],     // Pro seznam
-  "id": 123,          // Pro jednotlivé záznamy
-  "message": "..."    // Pro potvrzení operací
+  "items": [...],     // For lists
+  "id": 123,          // For individual records
+  "message": "..."    // For operation confirmations
 }
 ```
 
-### Chybová odpověď
+### Error Response
 ```json
 {
-  "error": "Popis chyby",
-  "details": "Dodatečné detaily"
+  "error": "Error description",
+  "details": "Additional details"
 }
 ```
 
-## 🚫 HTTP Status kódy
+## 🚫 HTTP Status Codes
 
-- `200` - Úspěch
-- `201` - Vytvořeno
-- `400` - Špatný request
-- `401` - Neautorizováno
-- `404` - Nenalezeno
-- `503` - Služba nedostupná (harvester API)
-- `500` - Serverová chyba
+- `200` - Success
+- `201` - Created
+- `400` - Bad request
+- `401` - Unauthorized
+- `404` - Not found
+- `503` - Service unavailable (harvester API)
+- `500` - Server error
 
-## 🔄 Integrační flow
+## 🔄 Integration Flow
 
-### Registrace harvesteru
-1. Harvester se spustí
-2. Zavolá `PUT /api/v1/harvesters/{name}` s host a network metrics
-3. Backend uloží/aktualizuje záznam
+### Harvester Registration
+1. Harvester starts
+2. Calls `PUT /api/v1/harvesters/{name}` with host and network metrics
+3. Backend saves/updates record
 
-### Harvest scheduling
-1. Frontend vytvoří schedule: `POST /api/v1/harvest-schedule`
-2. Backend uloží do DB a automaticky zavolá harvester API
-3. Harvester obdrží job a naplánuje si ho
-4. Při změnách se harvester automaticky synchronizuje
+### Harvest Scheduling
+1. Frontend creates schedule: `POST /api/v1/harvest-schedule`
+2. Backend saves to DB and automatically calls harvester API
+3. Harvester receives job and schedules it
+4. On changes, harvester automatically synchronizes
 
-### Analysis workflow
-1. Frontend vytvoří analýzu s workflow
-2. Frontend spustí analýzu: `POST /api/v1/analyses/{id}/run`
-3. Backend postupně spouští skripty z workflow
-4. Výsledky se ukládají do `results/{resultId}/`
-5. Frontend může stáhnout ZIP s výsledky
+### Analysis Workflow
+1. Frontend creates analysis with workflow
+2. Frontend runs analysis: `POST /api/v1/analyses/{id}/run`
+3. Backend sequentially executes scripts from workflow
+4. Results are saved to `results/{resultId}/`
+5. Frontend can download ZIP with results

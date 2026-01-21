@@ -1,6 +1,6 @@
 # Harvest Schedule Import API
 
-Dokumentace pro import dat z harvesteru do databáze.
+Documentation for importing data from harvester to database.
 
 ## Endpoint
 
@@ -8,56 +8,56 @@ Dokumentace pro import dat z harvesteru do databáze.
 POST /api/v1/harvest-schedule/import/:id
 ```
 
-## Autentifikace
+## Authentication
 
-✅ Vyžaduje JWT token v hlavičce
+✅ Requires JWT token in header
 
-## Parametry
+## Parameters
 
-### URL parametr
-- `id` (integer) - ID harvest schedule jobu
+### URL parameter
+- `id` (integer) - Harvest schedule job ID
 
-### Query/Body parametry (volitelné)
+### Query/Body parameters (optional)
 
 #### Date Range Filtering
-- `from` (string) - ISO 8601 datetime, např. `2025-10-01T00:00:00Z`
-  - Filtruje data podle modification time
-  - Zahrnuje JSON soubory, screenshoty a obrázky
+- `from` (string) - ISO 8601 datetime, e.g., `2025-10-01T00:00:00Z`
+  - Filters data by modification time
+  - Includes JSON files, screenshots and images
   
-- `to` (string) - ISO 8601 datetime, např. `2025-10-31T23:59:59Z`
-  - Filtruje data podle modification time
-  - Zahrnuje JSON soubory, screenshoty a obrázky
+- `to` (string) - ISO 8601 datetime, e.g., `2025-10-31T23:59:59Z`
+  - Filters data by modification time
+  - Includes JSON files, screenshots and images
 
 #### Content Type Filtering
-- `screenshots` (boolean) - Zahrnout price screenshoty
-  - Filtruje soubory: `*prices*.png`, `*prices*.jpg`
+- `screenshots` (boolean) - Include price screenshots
+  - Filters files: `*prices*.png`, `*prices*.jpg`
   - Default: `false`
   
-- `images` (boolean) - Zahrnout product obrázky
-  - Filtruje soubory: `product*.jpg`, `product*.png`
+- `images` (boolean) - Include product images
+  - Filters files: `product*.jpg`, `product*.png`
   - Default: `false`
 
 ## Request Examples
 
-### cURL - všechna data
+### cURL - all data
 ```bash
 curl -X POST http://localhost:3000/api/v1/harvest-schedule/import/123 \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
-### cURL - s date range
+### cURL - with date range
 ```bash
 curl -X POST "http://localhost:3000/api/v1/harvest-schedule/import/123?from=2025-10-01T00:00:00Z&to=2025-10-31T23:59:59Z" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
-### cURL - s obrázky a screenshoty
+### cURL - with images and screenshots
 ```bash
 curl -X POST "http://localhost:3000/api/v1/harvest-schedule/import/123?images=true&screenshots=true" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
-### cURL - komplexní příklad
+### cURL - complex example
 ```bash
 curl -X POST "http://localhost:3000/api/v1/harvest-schedule/import/123?from=2025-10-01T00:00:00Z&to=2025-10-31T23:59:59Z&images=true&screenshots=true" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
@@ -109,7 +109,7 @@ const response = await axios.post(
 }
 ```
 
-**Poznámka:** Import běží asynchronně na pozadí. Response je okamžitá.
+**Note:** Import runs asynchronously in background. Response is immediate.
 
 ### Error Responses
 
@@ -146,56 +146,56 @@ const response = await axios.post(
 ```
 1. Client → Backend: POST /import/123?params
    ↓
-2. Backend → DB: Získá harvester host pro schedule
+2. Backend → DB: Get harvester host for schedule
    ↓
 3. Backend → Harvester: GET /export/123?params
-   ↓ (stahuje ZIP)
-4. Backend → Disk: Uloží ZIP do ./temp/harvest_123_timestamp.zip
+   ↓ (downloading ZIP)
+4. Backend → Disk: Save ZIP to ./temp/harvest_123_timestamp.zip
    ↓
 5. Backend → Client: Response { status: "downloading" }
-   ↓ (async pokračuje)
+   ↓ (async continues)
 6. Backend → Script: node scripts/import-data.js zipFile
    ↓
-7. Script: Rozbalí ZIP, zpracuje data, importuje do DB
+7. Script: Extract ZIP, process data, import to DB
    ↓
-8. Backend: Smaže dočasný ZIP soubor
+8. Backend: Delete temporary ZIP file
    ↓
-9. ✓ Import dokončen (logováno do konzole)
+9. ✓ Import completed (logged to console)
 ```
 
 ## Harvester Export API
 
-Backend volá harvester export endpoint:
+Backend calls harvester export endpoint:
 ```
 GET {harvester_host}/export/{harvestingJobId}?from=...&to=...&images=...&screenshots=...
 ```
 
-**Očekávaná response:**
+**Expected response:**
 - Content-Type: `application/zip`
-- Binary ZIP soubor obsahující:
-  - JSON soubory s daty
-  - Product obrázky (pokud `images=true`)
-  - Price screenshoty (pokud `screenshots=true`)
+- Binary ZIP file containing:
+  - JSON files with data
+  - Product images (if `images=true`)
+  - Price screenshots (if `screenshots=true`)
 
 ## Import Script
 
-Backend spouští: `node scripts/import-data.js <zipFilePath>`
+Backend runs: `node scripts/import-data.js <zipFilePath>`
 
-**Script odpovědnosti:**
-1. Rozbalit ZIP soubor
-2. Načíst a parsovat JSON data
-3. Zpracovat obrázky (uložit, optimalizovat)
-4. Importovat data do databáze
-5. Vrátit exit code 0 při úspěchu
+**Script responsibilities:**
+1. Extract ZIP file
+2. Load and parse JSON data
+3. Process images (save, optimize)
+4. Import data to database
+5. Return exit code 0 on success
 
 **Logging:**
-- stdout - průběh importu
-- stderr - chyby
-- Exit code 0 = úspěch, jinak = chyba
+- stdout - import progress
+- stderr - errors
+- Exit code 0 = success, otherwise = error
 
 ## Monitoring
 
-Backend loguje do konzole:
+Backend logs to console:
 ```
 Starting import for schedule 123 from harvester Main Harvester
 Export endpoint: /export/123?from=2025-10-01T00:00:00Z&to=2025-10-31T23:59:59Z
@@ -209,23 +209,23 @@ Deleted temporary ZIP file: ./temp/harvest_123_1697123456789.zip
 
 ## Error Handling
 
-Import je asynchronní, takže chyby se logují do konzole:
+Import is asynchronous, so errors are logged to console:
 
 ```javascript
-// Chyby při stahování
+// Download errors
 console.error('Failed to download ZIP: HTTP 500 Internal Server Error');
 
-// Chyby při importu
+// Import errors
 console.error('Import failed for schedule 123: Import script exited with code 1');
 
-// Dočasný ZIP se vždy pokusí smazat i při chybě
+// Temporary ZIP is always attempted to be deleted even on error
 ```
 
 ## Best Practices
 
 ### 1. Date Range
 ```javascript
-// Poslední měsíc
+// Last month
 const from = new Date();
 from.setMonth(from.getMonth() - 1);
 const to = new Date();
@@ -238,47 +238,47 @@ const params = {
 
 ### 2. Polling Status
 ```javascript
-// Import je async, můžeš pollovat DB nebo implementovat webhook
+// Import is async, you can poll DB or implement webhook
 async function checkImportStatus(scheduleId) {
-  // Implementuj endpoint pro kontrolu statusu
+  // Implement endpoint to check status
   // GET /api/v1/harvest-schedule/import-status/:id
 }
 ```
 
 ### 3. Large Files
 ```javascript
-// Pro velké soubory zvětši timeout
-// Backend má timeout 5 minut (300000ms)
-// Zvětši na frontendové straně taky
+// For large files increase timeout
+// Backend has 5 minute timeout (300000ms)
+// Increase on frontend side too
 ```
 
 ## Production Considerations
 
-1. **Rate Limiting** - Implementuj rate limiting pro import endpoint
-2. **Queue System** - Pro více souběžných importů použij frontu (Bull, Bee-Queue)
-3. **Status Tracking** - Ulož import status do DB pro monitoring
-4. **Webhooks** - Implementuj webhooks pro notifikace po dokončení
-5. **Disk Space** - Monitoruj volné místo v ./temp/
-6. **Cleanup** - Pravidelně mazej staré temp soubory
-7. **Logging** - Loguj do souboru nebo external service (Winston, Sentry)
+1. **Rate Limiting** - Implement rate limiting for import endpoint
+2. **Queue System** - For multiple concurrent imports use queue (Bull, Bee-Queue)
+3. **Status Tracking** - Store import status in DB for monitoring
+4. **Webhooks** - Implement webhooks for completion notifications
+5. **Disk Space** - Monitor free space in ./temp/
+6. **Cleanup** - Regularly delete old temp files
+7. **Logging** - Log to file or external service (Winston, Sentry)
 
 ## Troubleshooting
 
-### ZIP se nestáhne
-- Zkontroluj harvester host v DB
-- Ověř že harvester běží
-- Zkontroluj network connectivity
+### ZIP doesn't download
+- Check harvester host in DB
+- Verify harvester is running
+- Check network connectivity
 
-### Import script failuje
-- Zkontroluj permissions na scripts/import-data.js
-- Ověř že Node.js je nainstalovaný
-- Zkontroluj logy: `stderr` obsahuje error message
+### Import script fails
+- Check permissions on scripts/import-data.js
+- Verify Node.js is installed
+- Check logs: `stderr` contains error message
 
-### Temp soubory se hromadí
+### Temp files accumulating
 ```bash
-# Ručně vyčisti temp složku
+# Manually clean temp folder
 rm -rf ./temp/harvest_*.zip
 
-# Implementuj cleanup job
+# Implement cleanup job
 node scripts/cleanup-temp.js
 ```

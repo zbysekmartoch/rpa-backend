@@ -12,16 +12,16 @@ import { authenticateToken } from './middleware/auth.js';
 
 const app = express();
 
-// Logování
+// Logging
 app.use(pinoHttp());
 
-// Security hlavičky
+// Security headers
 app.use(helmet());
 
 // CORS
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin) return cb(null, true); // např. curl
+    if (!origin) return cb(null, true); // e.g., curl
     if (config.corsOrigins.length === 0 || config.corsOrigins.includes(origin)) {
       return cb(null, true);
     }
@@ -30,10 +30,10 @@ app.use(cors({
   credentials: true
 }));
 
-// Parsování JSON
+// JSON parsing
 app.use(express.json({ limit: '1mb' }));
 
-// Rate limiting (základ, upravíme podle potřeby)
+// Rate limiting (basic, adjust as needed)
 app.use('/api/', rateLimit({ windowMs: 60_000, max: 300 }));
 
 // Mount API routes
@@ -45,7 +45,7 @@ app.use(errorHandler);
 
 // Start
 const server = app.listen(config.port, async () => {
-  // Ověř DB připojení při startu
+  // Verify DB connection on startup
   await getPool().query('SELECT 1');
   console.log(`API listening on http://localhost:${config.port} env=${config.env}`);
 });

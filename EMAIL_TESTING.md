@@ -1,19 +1,19 @@
-# Testování Reset Hesla přes E-mail
+# Email Password Reset Testing
 
-## Příprava
+## Setup
 
-### 1. Konfigurace Gmail (doporučeno pro testování)
+### 1. Gmail Configuration (Recommended for Testing)
 
-1. **Zapni 2-Factor Authentication**
-   - Jdi na https://myaccount.google.com/security
-   - Zapni "2-Step Verification"
+1. **Enable 2-Factor Authentication**
+   - Go to https://myaccount.google.com/security
+   - Enable "2-Step Verification"
 
-2. **Vygeneruj App Password**
-   - Jdi na https://myaccount.google.com/apppasswords
-   - Vytvoř nový App Password pro "Mail"
-   - Zkopíruj vygenerované heslo (16 znaků)
+2. **Generate App Password**
+   - Go to https://myaccount.google.com/apppasswords
+   - Create new App Password for "Mail"
+   - Copy generated password (16 characters)
 
-3. **Nastav .env**
+3. **Configure .env**
    ```bash
    EMAIL_HOST=smtp.gmail.com
    EMAIL_PORT=587
@@ -24,9 +24,9 @@
    FRONTEND_URL=http://localhost:5173
    ```
 
-### 2. Alternativní SMTP servery
+### 2. Alternative SMTP Servers
 
-#### Mailtrap (pro development)
+#### Mailtrap (for development)
 ```bash
 EMAIL_HOST=smtp.mailtrap.io
 EMAIL_PORT=2525
@@ -51,9 +51,9 @@ EMAIL_USER=your-email@outlook.com
 EMAIL_PASSWORD=your-password
 ```
 
-## Testování API
+## API Testing
 
-### 1. Registrace uživatele (pokud ještě nemáš)
+### 1. Register User (if not already)
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/auth/register \
@@ -66,7 +66,7 @@ curl -X POST http://localhost:3000/api/v1/auth/register \
   }'
 ```
 
-### 2. Žádost o reset hesla
+### 2. Request Password Reset
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/auth/reset-password \
@@ -76,23 +76,23 @@ curl -X POST http://localhost:3000/api/v1/auth/reset-password \
   }'
 ```
 
-**Očekávaná odpověď:**
+**Expected response:**
 ```json
 {
-  "message": "Pokud e-mail existuje v systému, byly na něj odeslány pokyny pro obnovení hesla"
+  "message": "If the email exists in the system, password reset instructions have been sent"
 }
 ```
 
-**Co se stane:**
-- Backend vygeneruje JWT token s 1h expirací
-- Odešle e-mail s reset linkem
-- E-mail obsahuje odkaz typu: `http://localhost:5173/reset-password?token=eyJhbG...`
+**What happens:**
+- Backend generates JWT token with 1h expiration
+- Sends email with reset link
+- Email contains link like: `http://localhost:5173/reset-password?token=eyJhbG...`
 
-### 3. Zkontroluj e-mail
+### 3. Check Email
 
-Otevři e-mail a zkopíruj token z URL (část za `?token=`)
+Open email and copy token from URL (part after `?token=`)
 
-### 4. Potvrzení nového hesla
+### 4. Confirm New Password
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/auth/reset-password/confirm \
@@ -103,14 +103,14 @@ curl -X POST http://localhost:3000/api/v1/auth/reset-password/confirm \
   }'
 ```
 
-**Očekávaná odpověď:**
+**Expected response:**
 ```json
 {
-  "message": "Heslo bylo úspěšně změněno. Nyní se můžete přihlásit s novým heslem."
+  "message": "Password changed successfully. You can now login with your new password."
 }
 ```
 
-### 5. Ověř nové heslo
+### 5. Verify New Password
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/auth/login \
@@ -121,44 +121,44 @@ curl -X POST http://localhost:3000/api/v1/auth/login \
   }'
 ```
 
-## Testování bez e-mailové konfigurace
+## Testing Without Email Configuration
 
-Pokud nemáš nakonfigurovaný SMTP server, backend bude fungovat, ale:
-- Reset token se vypíše do konzole serveru
-- E-mail se neodešle
-- Můžeš ručně zkopírovat token z konzole pro testování
+If SMTP server is not configured, backend will still work, but:
+- Reset token is printed to server console
+- Email is not sent
+- You can manually copy token from console for testing
 
-**Hledej v konzoli:**
+**Look for in console:**
 ```
-Reset email odeslán: <messageId>
+Reset email sent: <messageId>
 ```
-nebo
+or
 ```
-Email transport není nakonfigurován. Reset token: eyJhbG...
+Email transport not configured. Reset token: eyJhbG...
 ```
 
-## Možné chyby a řešení
+## Common Errors and Solutions
 
-### "Email transport není nakonfigurován"
-- Zkontroluj EMAIL_USER a EMAIL_PASSWORD v .env
-- Restartuj server po změně .env
+### "Email transport not configured"
+- Check EMAIL_USER and EMAIL_PASSWORD in .env
+- Restart server after changing .env
 
 ### "Invalid login: 535 Authentication failed"
-- Pro Gmail: použij App Password místo normálního hesla
-- Zkontroluj, že máš zapnuté 2FA
+- For Gmail: use App Password instead of regular password
+- Check that 2FA is enabled
 
 ### "Token expired"
-- Token má platnost 1 hodinu
-- Požádej o nový reset hesla
+- Token is valid for 1 hour
+- Request new password reset
 
-### E-mail nepřichází
-- Zkontroluj spam složku
-- Ověř EMAIL_FROM adresu
-- Zkus jiný SMTP server (např. Mailtrap pro testování)
+### Email not arriving
+- Check spam folder
+- Verify EMAIL_FROM address
+- Try different SMTP server (e.g., Mailtrap for testing)
 
-## Frontend implementace
+## Frontend Implementation
 
-Vytvoř stránku `/reset-password` ve frontendu:
+Create `/reset-password` page in frontend:
 
 ```javascript
 // ResetPassword.jsx
@@ -191,23 +191,23 @@ function ResetPassword() {
         }, 2000);
       }
     } catch (error) {
-      setMessage('Chyba při resetování hesla');
+      setMessage('Error resetting password');
     }
   };
 
   return (
     <div>
-      <h1>Reset hesla</h1>
+      <h1>Reset Password</h1>
       <form onSubmit={handleSubmit}>
         <input
           type="password"
-          placeholder="Nové heslo"
+          placeholder="New password"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
           required
           minLength="8"
         />
-        <button type="submit">Změnit heslo</button>
+        <button type="submit">Change Password</button>
       </form>
       {message && <p>{message}</p>}
     </div>
@@ -217,8 +217,8 @@ function ResetPassword() {
 
 ## Monitoring
 
-Pro produkci zvažte:
-- Logování všech reset pokusů
-- Rate limiting pro reset endpointy
-- Monitoring doručování e-mailů
-- Alerting při selhání SMTP
+For production consider:
+- Logging all reset attempts
+- Rate limiting for reset endpoints
+- Email delivery monitoring
+- Alerting on SMTP failures

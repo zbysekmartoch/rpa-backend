@@ -21,7 +21,7 @@ export function getPool() {
   return pool;
 }
 
-// jednoduchý helper pro dotazy
+// Simple helper for queries
 export async function query(sql, params) {
   const [rows] = await getPool().execute(sql, params);
   return rows;

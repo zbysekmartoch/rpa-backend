@@ -4,7 +4,7 @@ import { Router } from 'express';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getSecurePath, listFiles, createUploadMiddleware } from '../utils/file-manager.js';
+import { getSecurePath, listFiles, createUploadMiddleware, getDefaultDepth } from '../utils/file-manager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,7 +37,7 @@ router.get('/', async (req, res, next) => {
     }
     
     // Vypíš obsah
-    const files = await listFiles(targetPath, subdir || '', 2);
+    const files = await listFiles(targetPath, subdir || '', getDefaultDepth());
     
     res.json({
       root: subdir || '',

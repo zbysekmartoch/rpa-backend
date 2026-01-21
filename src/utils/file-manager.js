@@ -2,8 +2,33 @@
 // Zobecněný modul pro správu souborů - listing, čtení, zápis, upload, download, mazání
 
 import { promises as fs } from 'fs';
+import { readFileSync } from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import multer from 'multer';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Načti konfiguraci z config.json
+let fileManagerConfig = { defaultDepth: 4 };
+try {
+  const configPath = path.resolve(__dirname, '../../config.json');
+  const configData = JSON.parse(readFileSync(configPath, 'utf-8'));
+  if (configData.fileManager) {
+    fileManagerConfig = { ...fileManagerConfig, ...configData.fileManager };
+  }
+} catch (err) {
+  console.warn('Could not load config.json for file-manager, using defaults');
+}
+
+/**
+ * Vrátí výchozí hloubku pro listování souborů
+ * @returns {number}
+ */
+export function getDefaultDepth() {
+  return fileManagerConfig.defaultDepth;
+}
 
 /**
  * Seznam povolených přípon pro zobrazení
@@ -54,7 +79,11 @@ export function getSecurePath(rootPath, relativePath) {
  * @param {string[]} options.allowedExtensions - Povolené přípony (default: ALLOWED_EXTENSIONS)
  * @returns {Array} - Seznam souborů a složek
  */
-export async function listFiles(dirPath, relativeTo = '', maxDepth = 2, currentDepth = 0, options = {}) {
+export async function listFiles(dirPath, relativeTo = '', maxDepth = null, currentDepth = 0, options = {}) {
+  // Použij konfigurovanou hloubku pokud není specifikována
+  if (maxDepth === null) {
+    maxDepth = fileManagerConfig.defaultDepth;
+  }
   const items = [];
   const allowedExts = options.allowedExtensions || ALLOWED_EXTENSIONS;
   
@@ -64,6 +93,10 @@ export async function listFiles(dirPath, relativeTo = '', maxDepth = 2, currentD
     const entries = await fs.readdir(dirPath, { withFileTypes: true });
     
     for (const entry of entries) {
+        if (fileManagerConfig.hiddenFilePrefixes?.some(prefix => entry.name.startsWith(prefix))) {
+          continue; // Skip hidden files/folders
+        }
+  
       const fullPath = path.join(dirPath, entry.name);
       const relativePath = path.join(relativeTo, entry.name);
       

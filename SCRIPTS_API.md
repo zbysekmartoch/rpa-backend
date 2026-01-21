@@ -1,41 +1,41 @@
 # Scripts Management API
 
-API pro správu souborů ve složce `scripts/` a podadresářích.
+API for managing files in `scripts/` folder and subdirectories.
 
-## 🎯 Účel
+## 🎯 Purpose
 
-Umožňuje React frontendu spravovat scripty pro analýzy, reporty a workflow:
-- Prohlížení souborů a složek
-- Editace textových souborů (`.py`, `.js`, `.workflow`, `.sql`, atd.)
-- Upload/download souborů
-- Mazání souborů
+Enables React frontend to manage scripts for analyses, reports and workflow:
+- Browse files and folders
+- Edit text files (`.py`, `.js`, `.workflow`, `.sql`, etc.)
+- Upload/download files
+- Delete files
 
-## 🔒 Bezpečnost
+## 🔒 Security
 
 ### Path Traversal Protection
 
-API implementuje několik úrovní ochrany:
+API implements multiple layers of protection:
 
-1. **Normalizace cesty** - `path.normalize()` odstraní `..`, `./`, redundantní `/`
-2. **Absolute path resolution** - `path.resolve()` vytvoří absolutní cestu
-3. **Prefix check** - Ověří že výsledná cesta začína na `SCRIPTS_ROOT`
-4. **Authentication** - Všechny endpointy vyžadují JWT token
+1. **Path normalization** - `path.normalize()` removes `..`, `./`, redundant `/`
+2. **Absolute path resolution** - `path.resolve()` creates absolute path
+3. **Prefix check** - Verifies resulting path starts with `SCRIPTS_ROOT`
+4. **Authentication** - All endpoints require JWT token
 
 ```javascript
-// ✅ Bezpečné cesty:
+// ✅ Safe paths:
 "analyzy/script.py"
 "reports/template.docx"
 "workflow.txt"
 
-// ❌ Blokované cesty:
+// ❌ Blocked paths:
 "../../../etc/passwd"
 "/etc/passwd"
 "analyzy/../../secrets.txt"
 ```
 
-### Autentifikace
+### Authentication
 
-Všechny endpointy vyžadují Bearer token:
+All endpoints require Bearer token:
 
 ```javascript
 headers: {
@@ -43,14 +43,14 @@ headers: {
 }
 ```
 
-## 📂 Struktura Složek
+## 📂 Folder Structure
 
 ```
 scripts/
 ├── analyzy/              # Python analysis scripts
 │   ├── dbsettings.py
 │   ├── plot_*.py
-│   └── .venv/           # Ignorováno
+│   └── .venv/           # Ignored
 ├── reports/             # Report templates & generator
 │   ├── reporter.js
 │   ├── templateM.docx
@@ -59,9 +59,9 @@ scripts/
 └── *.workflow           # Workflow definitions
 ```
 
-## 🚀 Použití z React Frontendu
+## 🚀 Usage from React Frontend
 
-### 1. Výpis souborů
+### 1. List Files
 
 ```typescript
 interface ScriptFile {
@@ -90,13 +90,13 @@ async function listScripts(subdir?: string): Promise<ScriptFile[]> {
   return data.items;
 }
 
-// Použití:
+// Usage:
 const allScripts = await listScripts();
 const analysisScripts = await listScripts('analyzy');
 const reportScripts = await listScripts('reports');
 ```
 
-### 2. Načtení obsahu souboru
+### 2. Load File Content
 
 ```typescript
 async function loadFileContent(filePath: string): Promise<string> {
@@ -117,11 +117,11 @@ async function loadFileContent(filePath: string): Promise<string> {
   return data.content;
 }
 
-// Použití:
+// Usage:
 const scriptCode = await loadFileContent('analyzy/plot_cenovy_odstup_b.py');
 ```
 
-### 3. Uložení změn
+### 3. Save Changes
 
 ```typescript
 async function saveFileContent(
@@ -145,14 +145,14 @@ async function saveFileContent(
   }
 }
 
-// Použití:
+// Usage:
 await saveFileContent(
   'analyzy/script.py',
   '#!/usr/bin/env python3\nprint("Updated")'
 );
 ```
 
-### 4. Upload nového souboru
+### 4. Upload New File
 
 ```typescript
 async function uploadFile(
@@ -176,21 +176,21 @@ async function uploadFile(
   }
 }
 
-// Použití:
+// Usage:
 const fileInput = document.querySelector('input[type="file"]');
 await uploadFile(fileInput.files[0], 'analyzy');
 ```
 
-### 5. Stažení souboru
+### 5. Download File
 
 ```typescript
 async function downloadFile(filePath: string): Promise<void> {
   const url = `/api/v1/scripts/download?file=${encodeURIComponent(filePath)}`;
   
-  // Otevři v novém okně nebo použij fetch + blob
+  // Open in new window or use fetch + blob
   window.open(url + `&token=${getToken()}`, '_blank');
   
-  // Nebo s fetch:
+  // Or with fetch:
   const response = await fetch(url, {
     headers: {
       'Authorization': `Bearer ${getToken()}`
@@ -206,7 +206,7 @@ async function downloadFile(filePath: string): Promise<void> {
 }
 ```
 
-### 6. Smazání souboru
+### 6. Delete File
 
 ```typescript
 async function deleteFile(filePath: string): Promise<void> {
@@ -225,13 +225,13 @@ async function deleteFile(filePath: string): Promise<void> {
   }
 }
 
-// Použití s potvrzením:
-if (confirm('Opravdu smazat?')) {
+// Usage with confirmation:
+if (confirm('Really delete?')) {
   await deleteFile('analyzy/old_script.py');
 }
 ```
 
-## 🎨 React Komponenta - Příklad
+## 🎨 React Component - Example
 
 ```tsx
 import { useState, useEffect } from 'react';
@@ -242,7 +242,7 @@ function ScriptEditor() {
   const [content, setContent] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
-  // Načti seznam souborů
+  // Load file list
   useEffect(() => {
     loadFiles();
   }, []);
@@ -252,7 +252,7 @@ function ScriptEditor() {
     setFiles(data);
   }
 
-  // Načti obsah vybraného souboru
+  // Load selected file content
   async function handleFileSelect(filePath: string) {
     setLoading(true);
     try {
@@ -266,16 +266,16 @@ function ScriptEditor() {
     }
   }
 
-  // Ulož změny
+  // Save changes
   async function handleSave() {
     if (!selectedFile) return;
     
     setLoading(true);
     try {
       await saveFileContent(selectedFile, content);
-      alert('Uloženo!');
+      alert('Saved!');
     } catch (err) {
-      alert('Chyba při ukládání');
+      alert('Error saving');
     } finally {
       setLoading(false);
     }
@@ -284,7 +284,7 @@ function ScriptEditor() {
   return (
     <div className="script-editor">
       <aside className="file-list">
-        <h3>Scripty</h3>
+        <h3>Scripts</h3>
         {files.map(file => (
           <div 
             key={file.path}
@@ -302,7 +302,7 @@ function ScriptEditor() {
             <header>
               <h2>{selectedFile}</h2>
               <button onClick={handleSave} disabled={loading}>
-                Uložit
+                Save
               </button>
             </header>
             <textarea
@@ -318,9 +318,9 @@ function ScriptEditor() {
 }
 ```
 
-## 📋 Podporované Formáty
+## 📋 Supported Formats
 
-### Textové soubory (editovatelné)
+### Text files (editable)
 - `.js` - JavaScript
 - `.py` - Python
 - `.sql` - SQL
@@ -333,17 +333,17 @@ function ScriptEditor() {
 - `.yaml`, `.yml`
 - `.env`
 
-### Binární soubory (jen download/upload)
+### Binary files (download/upload only)
 - `.docx` - Word documents
 - `.png`, `.jpg` - Images
-- Ostatní formáty
+- Other formats
 
-## ⚠️ Omezení
+## ⚠️ Limitations
 
-- **Velikost souboru:** Max 50 MB
-- **Hloubka rekurze:** 2 úrovně při výpisu
-- **Autentifikace:** Povinná pro všechny operace
-- **Scope:** Pouze `scripts/` složka
+- **File size:** Max 50 MB
+- **Recursion depth:** 2 levels when listing
+- **Authentication:** Required for all operations
+- **Scope:** Only `scripts/` folder
 
 ## 🔍 Error Handling
 
@@ -365,15 +365,15 @@ try {
 
 ## 🛡️ Best Practices
 
-1. **Vždy validuj cesty** - Použij `encodeURIComponent()` pro parametry
-2. **Kontroluj isText flag** - Před editací ověř že soubor je textový
-3. **Backup před mazáním** - Umožni stažení před DELETE
-4. **Autosave** - Implementuj debounced autosave pro editaci
-5. **Syntax highlighting** - Použij Monaco Editor nebo CodeMirror
-6. **Diff view** - Ukaž změny před uložením
+1. **Always validate paths** - Use `encodeURIComponent()` for parameters
+2. **Check isText flag** - Verify file is text before editing
+3. **Backup before deleting** - Allow download before DELETE
+4. **Autosave** - Implement debounced autosave for editing
+5. **Syntax highlighting** - Use Monaco Editor or CodeMirror
+6. **Diff view** - Show changes before saving
 
 ## 📚 Reference
 
-- [API Documentation](../API.md#-správa-skriptů)
+- [API Documentation](./API.md#-scripts-management)
 - [Multer Documentation](https://github.com/expressjs/multer)
 - [Path Security Best Practices](https://owasp.org/www-community/attacks/Path_Traversal)

@@ -1,55 +1,55 @@
 # Python Environment Setup
 
-Dokumentace pro setup Python virtual environment pro analysis skripty.
+Documentation for Python virtual environment setup for analysis scripts.
 
-## Požadavky
+## Requirements
 
-- **Python 3.8+** (doporučeno 3.12)
+- **Python 3.8+** (3.12 recommended)
 - **pip** (Python package manager)
-- **venv** (standardně součástí Python 3)
+- **venv** (standard part of Python 3)
 
-## Rychlý Start
+## Quick Start
 
-### Automatický Setup (Doporučeno)
+### Automatic Setup (Recommended)
 
 ```bash
 cd scripts/analyzy
 ./setup-python-env.sh
 ```
 
-Script automaticky:
-1. ✅ Zkontroluje Python 3 instalaci
-2. ✅ Vytvoří virtual environment v `.venv/`
-3. ✅ Nainstaluje všechny dependencies z `requirements.txt`
-4. ✅ Zobrazí seznam nainstalovaných balíčků
+Script automatically:
+1. ✅ Checks Python 3 installation
+2. ✅ Creates virtual environment in `.venv/`
+3. ✅ Installs all dependencies from `requirements.txt`
+4. ✅ Shows list of installed packages
 
-### Manuální Setup
+### Manual Setup
 
 ```bash
 cd scripts/analyzy
 
-# Vytvoř virtual environment
+# Create virtual environment
 python3 -m venv .venv
 
-# Aktivuj environment
+# Activate environment
 source .venv/bin/activate
 
 # Upgrade pip
 pip install --upgrade pip
 
-# Nainstaluj dependencies
+# Install dependencies
 pip install -r requirements.txt
 
-# Ověř instalaci
+# Verify installation
 pip list
 ```
 
 ## Installed Packages
 
-Aktuální `requirements.txt` obsahuje:
+Current `requirements.txt` contains:
 
-- **contourpy** (1.3.1) - Konturové grafy
-- **cycler** (0.12.1) - Styling pro matplotlib
+- **contourpy** (1.3.1) - Contour plots
+- **cycler** (0.12.1) - Styling for matplotlib
 - **fonttools** (4.55.0) - Font utilities
 - **kiwisolver** (1.4.7) - Fast constraint solver
 - **matplotlib** (3.9.2) - Plotting library
@@ -65,46 +65,46 @@ Aktuální `requirements.txt` obsahuje:
 - **threadpoolctl** (3.6.0) - Thread pool control
 - **joblib** (1.4.2) - Lightweight pipelining
 
-## Použití
+## Usage
 
-### Aktivace Environment
+### Activate Environment
 
-**Před spuštěním Python skriptů vždy aktivuj environment:**
+**Always activate environment before running Python scripts:**
 
 ```bash
 cd scripts/analyzy
 source .venv/bin/activate
 ```
 
-Poznáš to podle `(.venv)` prefixu v terminálu:
+You'll recognize it by `(.venv)` prefix in terminal:
 ```bash
 (.venv) user@host:~/scripts/analyzy$
 ```
 
-### Deaktivace Environment
+### Deactivate Environment
 
 ```bash
 deactivate
 ```
 
-### Spuštění Analysis Scriptu
+### Run Analysis Script
 
 ```bash
-# Aktivuj environment
+# Activate environment
 source .venv/bin/activate
 
-# Spusť script
+# Run script
 python plot_cenovy_odstup_b.py
 
-# Nebo bez aktivace (použije .venv/bin/python přímo)
+# Or without activation (uses .venv/bin/python directly)
 .venv/bin/python plot_cenovy_odstup_b.py
 ```
 
 ## Backend Integration
 
-Backend automaticky používá Python z virtual environment při spouštění analysis skriptů.
+Backend automatically uses Python from virtual environment when running analysis scripts.
 
-V `config.json`:
+In `config.json`:
 ```json
 {
   "scriptCommands": {
@@ -116,24 +116,24 @@ V `config.json`:
 }
 ```
 
-## Přidání Nového Balíčku
+## Adding New Package
 
-### 1. Aktivuj environment
+### 1. Activate environment
 ```bash
 source .venv/bin/activate
 ```
 
-### 2. Nainstaluj balíček
+### 2. Install package
 ```bash
 pip install package-name
 ```
 
-### 3. Aktualizuj requirements.txt
+### 3. Update requirements.txt
 ```bash
 pip freeze > requirements.txt
 ```
 
-### 4. Commitni do gitu
+### 4. Commit to git
 ```bash
 git add requirements.txt
 git commit -m "Add package-name to Python dependencies"
@@ -142,14 +142,14 @@ git push
 
 ## Troubleshooting
 
-### Python 3 není nalezen
+### Python 3 not found
 
-**Problém:**
+**Problem:**
 ```bash
 python3: command not found
 ```
 
-**Řešení:**
+**Solution:**
 ```bash
 # Ubuntu/Debian
 sudo apt-get update
@@ -162,41 +162,41 @@ sudo yum install python3 python3-pip
 brew install python@3.12
 ```
 
-### Permission Denied na setup scriptu
+### Permission Denied on setup script
 
-**Problém:**
+**Problem:**
 ```bash
 -bash: ./setup-python-env.sh: Permission denied
 ```
 
-**Řešení:**
+**Solution:**
 ```bash
 chmod +x setup-python-env.sh
 ./setup-python-env.sh
 ```
 
-### Import Error po instalaci
+### Import Error after installation
 
-**Problém:**
+**Problem:**
 ```python
 ModuleNotFoundError: No module named 'matplotlib'
 ```
 
-**Řešení:**
+**Solution:**
 ```bash
-# Ujisti se že environment je aktivovaný
+# Make sure environment is activated
 source .venv/bin/activate
 
-# Znovu nainstaluj dependencies
+# Reinstall dependencies
 pip install -r requirements.txt
 ```
 
-### Stará verze balíčku
+### Old package version
 
-**Problém:**
-Potřebuješ novější verzi balíčku
+**Problem:**
+Need newer version of package
 
-**Řešení:**
+**Solution:**
 ```bash
 source .venv/bin/activate
 pip install --upgrade package-name
@@ -205,15 +205,15 @@ pip freeze > requirements.txt
 
 ### Virtual Environment Corruption
 
-**Problém:**
-Environment je poškozen nebo nefunkční
+**Problem:**
+Environment is corrupted or not working
 
-**Řešení:**
+**Solution:**
 ```bash
-# Smaž starý environment
+# Delete old environment
 rm -rf .venv
 
-# Vytvoř nový
+# Create new one
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -221,17 +221,17 @@ pip install -r requirements.txt
 
 ## Deployment
 
-### Na Produkčním Serveru
+### On Production Server
 
 ```bash
-# 1. Naklonuj repository
+# 1. Clone repository
 git clone https://github.com/zbysekmartoch/rpa-backend.git
 cd rpa-backend/scripts/analyzy
 
-# 2. Spusť setup
+# 2. Run setup
 ./setup-python-env.sh
 
-# 3. Ověř instalaci
+# 3. Verify installation
 source .venv/bin/activate
 python --version
 pip list
@@ -239,7 +239,7 @@ pip list
 
 ### Docker Deployment
 
-V `Dockerfile`:
+In `Dockerfile`:
 
 ```dockerfile
 FROM node:20-slim
@@ -302,25 +302,25 @@ jobs:
 
 ## Best Practices
 
-### 1. ✅ Vždy použij Virtual Environment
+### 1. ✅ Always Use Virtual Environment
 ```bash
-# ŠPATNĚ - globální instalace
+# WRONG - global installation
 pip install matplotlib
 
-# SPRÁVNĚ - do venv
+# RIGHT - into venv
 source .venv/bin/activate
 pip install matplotlib
 ```
 
-### 2. ✅ Udržuj requirements.txt aktuální
+### 2. ✅ Keep requirements.txt Updated
 ```bash
-# Po každé změně dependencies
+# After every dependency change
 pip freeze > requirements.txt
 git add requirements.txt
 git commit -m "Update Python dependencies"
 ```
 
-### 3. ✅ Verzuj requirements.txt, ne .venv
+### 3. ✅ Version requirements.txt, not .venv
 ```gitignore
 # .gitignore
 scripts/analyzy/.venv/
@@ -328,41 +328,41 @@ scripts/analyzy/__pycache__/
 *.pyc
 ```
 
-### 4. ✅ Dokumentuj speciální dependencies
-Pokud balíček vyžaduje systémové knihovny, přidej do README:
+### 4. ✅ Document Special Dependencies
+If package requires system libraries, add to README:
 
 ```markdown
 ## System Dependencies
 
-Pro `pillow` je potřeba:
+For `pillow` you need:
 ```bash
 sudo apt-get install libjpeg-dev zlib1g-dev
 ```
 ```
 
-### 5. ✅ Pin verze v production
-Pro stabilní production použij přesné verze:
+### 5. ✅ Pin Versions in Production
+For stable production use exact versions:
 
 ```txt
 matplotlib==3.9.2
 numpy==2.1.3
 ```
 
-Místo:
+Instead of:
 ```txt
 matplotlib>=3.9.0
 numpy
 ```
 
-## Výhody Virtual Environment
+## Virtual Environment Benefits
 
-1. **Izolace** - Každý projekt má své dependencies
-2. **Reprodukovatelnost** - Stejné verze všude
-3. **Bezpečnost** - Neovlivňuje systémový Python
-4. **Flexibilita** - Různé verze pro různé projekty
-5. **Deployment** - Snadné nasazení na server
+1. **Isolation** - Each project has its own dependencies
+2. **Reproducibility** - Same versions everywhere
+3. **Security** - Doesn't affect system Python
+4. **Flexibility** - Different versions for different projects
+5. **Deployment** - Easy server deployment
 
-## Struktura Složky
+## Folder Structure
 
 ```
 scripts/analyzy/
@@ -391,17 +391,17 @@ scripts/analyzy/
 
 ## FAQ
 
-**Q: Můžu použít virtualenv místo venv?**  
-A: Ano, ale `venv` je součástí Python 3 a je doporučený způsob.
+**Q: Can I use virtualenv instead of venv?**  
+A: Yes, but `venv` is part of Python 3 and is the recommended way.
 
-**Q: Jak aktualizovat všechny balíčky?**  
+**Q: How to update all packages?**  
 A: `pip list --outdated` + `pip install --upgrade package-name`
 
-**Q: Kolik místa zabírá .venv?**  
-A: Cca 200-500 MB podle počtu balíčků.
+**Q: How much space does .venv take?**  
+A: About 200-500 MB depending on number of packages.
 
-**Q: Můžu sdílet .venv mezi projekty?**  
-A: Ne, každý projekt by měl mít vlastní venv.
+**Q: Can I share .venv between projects?**  
+A: No, each project should have its own venv.
 
-**Q: Jak smazat cache?**  
-A: `pip cache purge` nebo `rm -rf ~/.cache/pip`
+**Q: How to clear cache?**  
+A: `pip cache purge` or `rm -rf ~/.cache/pip`

@@ -1,6 +1,6 @@
 # Health Check & Monitoring
 
-Dokumentace health check endpointu pro monitoring a diagnostiku backendu.
+Documentation for health check endpoint for backend monitoring and diagnostics.
 
 ## Endpoint
 
@@ -8,9 +8,9 @@ Dokumentace health check endpointu pro monitoring a diagnostiku backendu.
 GET /api/health
 ```
 
-## Autentifikace
+## Authentication
 
-❌ Nevyžaduje autentifikaci (veřejný endpoint)
+❌ Does not require authentication (public endpoint)
 
 ## Response
 
@@ -39,27 +39,27 @@ GET /api/health
 }
 ```
 
-### Parametry Response
+### Response Parameters
 
 #### Root level
-- `ok` (boolean) - Status služby (true = běží)
-- `service` (string) - Název aplikace z package.json
-- `version` (string) - Verze z package.json
-- `build` (string) - Build číslo (z ENV nebo verze)
+- `ok` (boolean) - Service status (true = running)
+- `service` (string) - Application name from package.json
+- `version` (string) - Version from package.json
+- `build` (string) - Build number (from ENV or version)
 - `timestamp` (string) - ISO 8601 timestamp
 
 #### Server object
-- `host` (string) - Hostname serveru (OS hostname)
-- `port` (number) - Port na kterém běží aplikace
-- `nodeVersion` (string) - Verze Node.js
-- `platform` (string) - Platforma OS (linux, darwin, win32)
-- `uptime` (number) - Uptime procesu v sekundách
+- `host` (string) - Server hostname (OS hostname)
+- `port` (number) - Port the application is running on
+- `nodeVersion` (string) - Node.js version
+- `platform` (string) - OS platform (linux, darwin, win32)
+- `uptime` (number) - Process uptime in seconds
 
 #### Database object
-- `host` (string) - Hostname databázového serveru
-- `port` (number) - Port databáze
-- `name` (string) - Název databáze
-- `user` (string) - Uživatel pro připojení k DB
+- `host` (string) - Database server hostname
+- `port` (number) - Database port
+- `name` (string) - Database name
+- `user` (string) - User for DB connection
 
 ### Error (500 Internal Server Error)
 
@@ -71,9 +71,9 @@ GET /api/health
 }
 ```
 
-## Použití
+## Usage
 
-### 1. Základní check
+### 1. Basic check
 
 ```bash
 curl http://localhost:3000/api/health
@@ -131,7 +131,7 @@ readinessProbe:
 ### 6. Prometheus monitoring
 
 ```javascript
-// Express middleware pro Prometheus metrics
+// Express middleware for Prometheus metrics
 import prometheus from 'prom-client';
 
 const healthGauge = new prometheus.Gauge({
@@ -148,7 +148,7 @@ setInterval(async () => {
   } catch (error) {
     healthGauge.set(0);
   }
-}, 10000); // každých 10 sekund
+}, 10000); // every 10 seconds
 ```
 
 ### 7. Node.js monitoring client
@@ -177,14 +177,14 @@ async function checkHealth() {
   }
 }
 
-// Periodický check
+// Periodic check
 setInterval(async () => {
   const isHealthy = await checkHealth();
   if (!isHealthy) {
     // Alert/notification logic
     console.error('⚠️ Service is unhealthy!');
   }
-}, 60000); // každou minutu
+}, 60000); // every minute
 ```
 
 ### 8. Python monitoring script
@@ -220,7 +220,7 @@ while True:
     time.sleep(60)  # Check every minute
 ```
 
-### 9. Uptime monitoring s alertem
+### 9. Uptime monitoring with alerts
 
 ```javascript
 const nodemailer = require('nodemailer');
@@ -255,23 +255,23 @@ async function monitorHealth() {
 }
 
 async function sendAlert(health) {
-  // Implementace alertu (email, Slack, SMS, etc.)
+  // Alert implementation (email, Slack, SMS, etc.)
   console.error('🚨 ALERT: Service is down!');
   // Reset counter after alert
   failureCount = 0;
 }
 
-// Check každých 30 sekund
+// Check every 30 seconds
 setInterval(monitorHealth, 30000);
 ```
 
 ### 10. Grafana Dashboard Query
 
 ```
-# Prometheus query pro Grafana
+# Prometheus query for Grafana
 app_health{job="rpa-backend"}
 
-# PromQL pro uptime
+# PromQL for uptime
 process_uptime_seconds{job="rpa-backend"}
 
 # Alert rule
@@ -287,7 +287,7 @@ ALERT ServiceDown
 
 ## Build Number Configuration
 
-Pro nastavení build čísla v CI/CD:
+To set build number in CI/CD:
 
 ### GitHub Actions
 
@@ -327,46 +327,46 @@ PORT=3000
 
 ## Troubleshooting
 
-### Health check vrací 500
+### Health check returns 500
 
-**Možné příčiny:**
-1. Nečitelný package.json
-2. Chybějící config.js
-3. Nesprávná DB konfigurace
+**Possible causes:**
+1. Unreadable package.json
+2. Missing config.js
+3. Incorrect DB configuration
 
-**Řešení:**
+**Solution:**
 ```bash
-# Zkontroluj package.json
+# Check package.json
 cat package.json | jq .version
 
-# Zkontroluj config
+# Check config
 node -e "import('./src/config.js').then(c => console.log(c.config))"
 
-# Zkontroluj logy
+# Check logs
 tail -f logs/error.log
 ```
 
-### Uptime je nízký po restartu
+### Uptime is low after restart
 
-To je normální - `process.uptime()` se resetuje při restartu procesu.
+This is normal - `process.uptime()` resets on process restart.
 
-### Database credentials ve výstupu
+### Database credentials in output
 
-Health endpoint **nezobrazuje password**, pouze host, port, name a user.
+Health endpoint **does not show password**, only host, port, name and user.
 
 ## Security Considerations
 
-1. **Password protection** - Heslo k DB není zahrnuto v response
-2. **Rate limiting** - Zvažte rate limiting pro public endpoint
-3. **DDoS protection** - Použijte reverse proxy (nginx, Cloudflare)
-4. **Sensitive data** - Response neobsahuje citlivé informace
+1. **Password protection** - DB password is not included in response
+2. **Rate limiting** - Consider rate limiting for public endpoint
+3. **DDoS protection** - Use reverse proxy (nginx, Cloudflare)
+4. **Sensitive data** - Response does not contain sensitive information
 
 ## Best Practices
 
-1. ✅ Používejte pro liveness a readiness probes
-2. ✅ Implementujte monitoring alerts
-3. ✅ Logujte health check failures
-4. ✅ Nastavte rozumné timeouty (3-5s)
-5. ✅ Periodické kontroly (30-60s interval)
-6. ⚠️ Nepoužívejte pro deep health checks (DB connectivity)
-7. ⚠️ Nepoužívejte příliš často (DDoS risk)
+1. ✅ Use for liveness and readiness probes
+2. ✅ Implement monitoring alerts
+3. ✅ Log health check failures
+4. ✅ Set reasonable timeouts (3-5s)
+5. ✅ Periodic checks (30-60s interval)
+6. ⚠️ Don't use for deep health checks (DB connectivity)
+7. ⚠️ Don't use too frequently (DDoS risk)

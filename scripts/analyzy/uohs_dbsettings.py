@@ -31,7 +31,6 @@ def load_data_json(json_path, default_values):
             if key not in data:
                 data[key] = default_value
         
-        print(f"Načtena konfigurace z {json_path}: {data}")
         return data
     except json.JSONDecodeError as e:
         print(f"Chyba: Neplatný JSON v souboru {json_path}: {e}")

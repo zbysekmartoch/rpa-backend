@@ -1,6 +1,6 @@
 # Manual Import API - Frontend Guide
 
-Návod pro implementaci manuálního importu dat na frontendu.
+Guide for implementing manual data import on frontend.
 
 ## Endpoint
 
@@ -8,21 +8,21 @@ Návod pro implementaci manuálního importu dat na frontendu.
 POST /api/v1/harvest/manual-import
 ```
 
-## Autentifikace
+## Authentication
 
-✅ Vyžaduje JWT token v hlavičce
+✅ Requires JWT token in header
 
 ## Request
 
 ### Headers
 ```
 Authorization: Bearer YOUR_JWT_TOKEN
-Content-Type: multipart/form-data (automaticky nastaveno při použití FormData)
+Content-Type: multipart/form-data (automatically set when using FormData)
 ```
 
 ### Body
-- FormData s polem `file` obsahujícím ZIP soubor
-- Max velikost: 500 MB
+- FormData with `file` field containing ZIP file
+- Max size: 500 MB
 
 ## Response
 
@@ -61,7 +61,7 @@ Content-Type: multipart/form-data (automaticky nastaveno při použití FormData
 
 ## Frontend Implementation
 
-### 1. React Component s file input
+### 1. React Component with file input
 
 ```jsx
 import { useState } from 'react';
@@ -76,16 +76,16 @@ function ManualImport() {
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
     
-    // Validace na frontendu
+    // Frontend validation
     if (selectedFile) {
       if (!selectedFile.name.toLowerCase().endsWith('.zip')) {
-        setError('Prosím vyberte ZIP soubor');
+        setError('Please select a ZIP file');
         return;
       }
       
       // Max 500 MB
       if (selectedFile.size > 500 * 1024 * 1024) {
-        setError('Soubor je příliš velký. Maximum je 500 MB.');
+        setError('File is too large. Maximum is 500 MB.');
         return;
       }
       
@@ -96,7 +96,7 @@ function ManualImport() {
 
   const handleUpload = async () => {
     if (!file) {
-      setError('Prosím vyberte soubor');
+      setError('Please select a file');
       return;
     }
 
@@ -108,7 +108,7 @@ function ManualImport() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const token = localStorage.getItem('token'); // nebo odkud získáváš token
+      const token = localStorage.getItem('token'); // or wherever you get token from
 
       const response = await axios.post(
         'http://localhost:3000/api/v1/harvest/manual-import',
@@ -116,25 +116,25 @@ function ManualImport() {
         {
           headers: {
             'Authorization': `Bearer ${token}`,
-            // 'Content-Type': 'multipart/form-data' - axios nastaví automaticky
+            // 'Content-Type': 'multipart/form-data' - axios sets automatically
           },
           onUploadProgress: (progressEvent) => {
             const percentCompleted = Math.round(
               (progressEvent.loaded * 100) / progressEvent.total
             );
-            setMessage(`Nahrávání: ${percentCompleted}%`);
+            setMessage(`Uploading: ${percentCompleted}%`);
           }
         }
       );
 
-      setMessage(`Import spuštěn! Soubor: ${response.data.filename}`);
+      setMessage(`Import started! File: ${response.data.filename}`);
       setFile(null);
       
       // Reset file input
       document.getElementById('file-input').value = '';
 
     } catch (err) {
-      setError(err.response?.data?.error || 'Chyba při nahrávání souboru');
+      setError(err.response?.data?.error || 'Error uploading file');
     } finally {
       setUploading(false);
     }
@@ -142,7 +142,7 @@ function ManualImport() {
 
   return (
     <div className="manual-import">
-      <h2>Manuální import dat</h2>
+      <h2>Manual Data Import</h2>
       
       <div className="file-input-container">
         <input
@@ -155,8 +155,8 @@ function ManualImport() {
         
         {file && (
           <div className="file-info">
-            <p>Vybraný soubor: {file.name}</p>
-            <p>Velikost: {(file.size / (1024 * 1024)).toFixed(2)} MB</p>
+            <p>Selected file: {file.name}</p>
+            <p>Size: {(file.size / (1024 * 1024)).toFixed(2)} MB</p>
           </div>
         )}
       </div>
@@ -165,7 +165,7 @@ function ManualImport() {
         onClick={handleUpload} 
         disabled={!file || uploading}
       >
-        {uploading ? 'Nahrávání...' : 'Nahrát a importovat'}
+        {uploading ? 'Uploading...' : 'Upload and Import'}
       </button>
 
       {message && (
@@ -181,9 +181,9 @@ function ManualImport() {
       )}
 
       <div className="info">
-        <p>ℹ️ Import běží na pozadí. Výsledky naleznete v konzoli serveru.</p>
-        <p>📦 Maximální velikost souboru: 500 MB</p>
-        <p>📄 Podporovaný formát: ZIP</p>
+        <p>ℹ️ Import runs in background. Results can be found in server console.</p>
+        <p>📦 Maximum file size: 500 MB</p>
+        <p>📄 Supported format: ZIP</p>
       </div>
     </div>
   );
@@ -192,7 +192,7 @@ function ManualImport() {
 export default ManualImport;
 ```
 
-### 2. Vanilla JavaScript s fetch
+### 2. Vanilla JavaScript with fetch
 
 ```javascript
 async function uploadZipFile(file) {
@@ -225,26 +225,26 @@ async function uploadZipFile(file) {
   }
 }
 
-// Použití
+// Usage
 document.getElementById('upload-btn').addEventListener('click', async () => {
   const fileInput = document.getElementById('file-input');
   const file = fileInput.files[0];
 
   if (!file) {
-    alert('Prosím vyberte soubor');
+    alert('Please select a file');
     return;
   }
 
   if (!file.name.endsWith('.zip')) {
-    alert('Prosím vyberte ZIP soubor');
+    alert('Please select a ZIP file');
     return;
   }
 
   try {
     const result = await uploadZipFile(file);
-    alert(`Import spuštěn! Soubor: ${result.filename}`);
+    alert(`Import started! File: ${result.filename}`);
   } catch (error) {
-    alert(`Chyba: ${error.message}`);
+    alert(`Error: ${error.message}`);
   }
 });
 ```
@@ -285,7 +285,7 @@ function DragDropImport() {
       const file = files[0];
       
       if (!file.name.toLowerCase().endsWith('.zip')) {
-        alert('Prosím nahrajte ZIP soubor');
+        alert('Please upload a ZIP file');
         return;
       }
 
@@ -318,12 +318,12 @@ function DragDropImport() {
       const data = await response.json();
       
       if (response.ok) {
-        alert(`Import spuštěn! ${data.message}`);
+        alert(`Import started! ${data.message}`);
       } else {
-        alert(`Chyba: ${data.error}`);
+        alert(`Error: ${data.error}`);
       }
     } catch (error) {
-      alert(`Chyba: ${error.message}`);
+      alert(`Error: ${error.message}`);
     }
   };
 
@@ -345,8 +345,8 @@ function DragDropImport() {
       />
       
       <div className="drop-zone-content">
-        <p>📦 Přetáhněte ZIP soubor sem</p>
-        <p>nebo klikněte pro výběr souboru</p>
+        <p>📦 Drag and drop ZIP file here</p>
+        <p>or click to select file</p>
       </div>
     </div>
   );
@@ -375,7 +375,7 @@ const styles = `
 `;
 ```
 
-### 4. Upload Progress s Axios
+### 4. Upload Progress with Axios
 
 ```jsx
 import { useState } from 'react';
@@ -411,10 +411,10 @@ function ProgressUpload() {
         }
       );
 
-      alert(`Import spuštěn! ${response.data.message}`);
+      alert(`Import started! ${response.data.message}`);
       
     } catch (error) {
-      alert(`Chyba: ${error.response?.data?.error || error.message}`);
+      alert(`Error: ${error.response?.data?.error || error.message}`);
     } finally {
       setUploading(false);
     }
@@ -439,24 +439,24 @@ function ProgressUpload() {
 
 ## Best Practices
 
-### 1. Validace na frontendu
+### 1. Frontend Validation
 ```javascript
 function validateZipFile(file) {
   const errors = [];
   
-  // Kontrola typu
+  // Type check
   if (!file.name.toLowerCase().endsWith('.zip')) {
-    errors.push('Soubor musí být ve formátu ZIP');
+    errors.push('File must be in ZIP format');
   }
   
-  // Kontrola velikosti (500 MB)
+  // Size check (500 MB)
   if (file.size > 500 * 1024 * 1024) {
-    errors.push('Soubor je příliš velký (max 500 MB)');
+    errors.push('File is too large (max 500 MB)');
   }
   
-  // Kontrola že není prázdný
+  // Check not empty
   if (file.size === 0) {
-    errors.push('Soubor je prázdný');
+    errors.push('File is empty');
   }
   
   return errors;
@@ -470,21 +470,21 @@ try {
   showSuccess(response.message);
 } catch (error) {
   if (error.response?.status === 413) {
-    showError('Soubor je příliš velký');
+    showError('File is too large');
   } else if (error.response?.status === 400) {
     showError(error.response.data.error);
   } else if (error.response?.status === 401) {
-    showError('Nejste přihlášeni');
+    showError('Not logged in');
     redirectToLogin();
   } else {
-    showError('Nastala chyba při nahrávání');
+    showError('Error occurred during upload');
   }
 }
 ```
 
 ### 3. UX Improvements
 ```jsx
-// Zobraz velikost souboru v lidsky čitelném formátu
+// Display file size in human-readable format
 function formatFileSize(bytes) {
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
@@ -492,7 +492,7 @@ function formatFileSize(bytes) {
   return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
 }
 
-// Prevence opuštění stránky během uploadu
+// Prevent page leave during upload
 useEffect(() => {
   const handleBeforeUnload = (e) => {
     if (uploading) {
@@ -508,23 +508,23 @@ useEffect(() => {
 
 ## Troubleshooting
 
-### Soubor se nenahraje
-- Zkontroluj že používáš správný Content-Type (multipart/form-data)
-- Ověř že pole se jmenuje `file`
-- Zkontroluj JWT token v Authorization hlavičce
+### File not uploading
+- Check you're using correct Content-Type (multipart/form-data)
+- Verify field name is `file`
+- Check JWT token in Authorization header
 
 ### 413 Payload Too Large
-- Soubor je větší než 500 MB
-- Zkontroluj velikost před uplodem
+- File is larger than 500 MB
+- Check size before upload
 
-### CORS chyby
-- Ověř že backend má správně nakonfigurovaný CORS
-- Zkontroluj že Authorization header je povolený
+### CORS errors
+- Verify backend has CORS configured correctly
+- Check that Authorization header is allowed
 
 ### Timeout
-- Pro velké soubory zvětši timeout v axios config
+- For large files increase timeout in axios config
 ```javascript
 axios.post(url, formData, {
-  timeout: 300000 // 5 minut
+  timeout: 300000 // 5 minutes
 })
 ```

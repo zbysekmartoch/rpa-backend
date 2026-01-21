@@ -6,6 +6,21 @@ import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import ImageModule from 'docxtemplater-image-module-free';
 import dotenv from 'dotenv';
+import { DateTime } from "luxon";
+
+const DEFAULT_LOCALE = "cs";
+const DEFAULT_ZONE = "Europe/Prague";
+const DEFAULT_PATTERN = "dd. MM. yyyy";
+
+// tokeny, které laikům dávají smysl a pokryjí datum+čas+jazyk
+const ALLOWED_TOKENS = new Set([
+  "yyyy",
+  "MM", "dd", "M", "d",
+  "HH", "mm", "ss",
+  "ccc", "cccc",     // den v týdnu (krátký / dlouhý)
+  "LLL", "LLLL"      // měsíc textem (krátký / dlouhý)
+]);
+
 
 dotenv.config();
 
@@ -20,6 +35,8 @@ if (!workingDir) {
     console.error('Chyba: Nebyl předán pracovní adresář jako parametr');
     process.exit(1);
 }
+
+let gImgParams=[]; // globální pole parametrů obrázků
 
 // Globální objekt pro data
 let data = {};
@@ -82,16 +99,13 @@ function buildImageModule(allProducts) {
         getImage: function (tagValue, tagName) {
             // tagValue očekáváme jako index produktu (číslo) nebo přímo buffer/filepath
             // V šabloně použijeme {{{img/slozka}}} a do data vložíme id → tady z cache vrátíme buffer.
-            let subFolderName = tagName.slice(4);
-            let imgPath = path.join(`${IMAGES_DIR}/${subFolderName}/${tagValue}`);
-            if (tagName == 'img_product') {
-                imgPath = path.join(`${PRODUCT_IMG_DIR}/product_${tagValue}`);
-            }
+            let subFolderName = gImgParams[tagValue]?.params?.path;
+            let index = gImgParams[tagValue]?.pathArr.slice(-2,-1)[0]; // předposlední část path je index v poli
+            let filename = data.products[index].id;
+            let imgPath = path.join(`${IMAGES_DIR}/${subFolderName}/${filename}`);
+ 
             // Pokud je tagValue přímo buffer nebo cesta k souboru, použij to
-            if (tagValue=='ABSOLUTE') {
-                imgPath = path.join(`${IMAGES_DIR}/${subFolderName}`);
-            }
-
+   
             if (fs.existsSync(imgPath + '.png')) {
                 return fs.readFileSync(imgPath + '.png');
             }
@@ -110,9 +124,12 @@ function buildImageModule(allProducts) {
         },
         getSize: function (img, tagValue, tagName) {
             // Šířka × výška v px; Word si to přepočítá. Uprav dle potřeby (např. 1100×650).
+            
+            return [gImgParams[tagValue]?.params?.width||500, 
+            gImgParams[tagValue]?.params?.height||400];
+
+            
             if (tagName == 'img_product') return [189, 189]
-             if (tagValue == 'ABSOLUTE') return [500, 375]
-            return [500, 625];
             return [500, 400];
             return [600, 480];
             return [640, 512];
@@ -127,46 +144,8 @@ function ISO2CZ(date) {
     return formatted;
 }
 
-/**
- * Přidá img_xxx atributy do reportData pro všechny obrázky v IMAGES_DIR
- * @param {Object} reportData - Objekt s daty reportu
- * @returns {Object} reportData obohacený o img_xxx atributy
- */
-function addImgTags(reportData) {
-    if (!fs.existsSync(IMAGES_DIR)) {
-        console.log(`Adresář ${IMAGES_DIR} neexistuje, přeskakuji přidávání img tagů`);
-        return reportData;
-    }
+function  fixTagsAndData(zip, reportData) {
 
-    try {
-        // Načti všechny soubory přímo v IMAGES_DIR (ne rekurzivně)
-        const files = fs.readdirSync(IMAGES_DIR, { withFileTypes: true });
-        
-        // Filtruj pouze PNG a JPG soubory (ne složky)
-        const imageFiles = files.filter(file => 
-            file.isFile() && 
-            (file.name.toLowerCase().endsWith('.png') || file.name.toLowerCase().endsWith('.jpg'))
-        );
-
-        console.log(`Nalezeno ${imageFiles.length} obrázků v ${IMAGES_DIR}`);
-
-        // Přidej img_xxx atributy
-        imageFiles.forEach(file => {
-            // Získej název souboru bez přípony
-            const nameWithoutExt = path.parse(file.name).name;
-            const attrName = `img_${nameWithoutExt}`;
-            
-            // Přidej atribut s hodnotou "ABSOLUTE"
-            reportData[attrName] = 'ABSOLUTE';
-            
-            console.log(`  + ${attrName} = "ABSOLUTE"`);
-        });
-
-        return reportData;
-    } catch (error) {
-        console.error(`Chyba při přidávání img tagů: ${error.message}`);
-        return reportData;
-    }
 }
 
 async function main() {
@@ -193,72 +172,42 @@ async function main() {
     //reportData.generatedAt = new Date().toLocaleString('cs-CZ', { dateStyle: 'long', timeStyle: 'short' });
 
  //   reportData = { ...reportData, ...data }
-    reportData.dateFromDMY=ISO2CZ(reportData.dateFrom);
-    reportData.dateToDMY=ISO2CZ(reportData.dateTo);
-    reportData.processedAtDMY=ISO2CZ(reportData.processedAt);
-   
-    addImgTags(reportData);
+   /* reportData.dateFromDMY=ISO2CZ(reportData.dateFrom);
+    reportData.dateToDMY=ISO2CZ(reportData.dateTo);*/
+   /* reportData.generatedAt = new Date().toLocaleString('cs-CZ', { dateStyle: 'long', timeStyle: 'short' });
+    reportData.productsCount = reportData.products.length;*/
+    // 3) Načti šablonu
+    const templatePath = path.join(__dirname, 'template.docx');
+    const content = fs.readFileSync(templatePath, 'binary');
 
-    // 3) Zpracuj konfigurace dokumentů
-    let docConfigs = [];
+    let zip = new PizZip(content);
+    //fixTagsAndData(zip,reportData);
     
-    // Kontrola zda existuje report.doc v datech
-    if (reportData.report && reportData.report.doc && Array.isArray(reportData.report.doc)) {
-        docConfigs = reportData.report.doc;
-        console.log(`Nalezeno ${docConfigs.length} konfigurací dokumentů v data.json`);
-    } else {
-        // Fallback na výchozí konfiguraci pro zpětnou kompatibilitu
-        console.log('Konfigurace report.doc nenalezena, použiji výchozí template.docx');
-        docConfigs = [{
-            template: 'template.docx',
-            renderTo: 'report.docx'
-        }];
+    const imageModule = buildImageModule(data.products);
+
+
+    const doc = new Docxtemplater(zip, {
+        modules: [imageModule],   
+        paragraphLoop: true,
+        linebreaks: true,
+        delimiters: { start: '[[', end: ']]' }, // <— DŮLEŽITÉ
+    });
+
+    let virtualData = createDeepIntrospectingGetLoggerProxy(reportData);
+
+    // 4) Renderuj s daty
+    try {
+        doc.render(virtualData);  //reportData
+    } catch (error) {
+        console.error('Chyba při renderu:', error);
+        throw error;
     }
 
-    // 4) Zpracuj každý dokument
-    for (const docConfig of docConfigs) {
-        const templateName = docConfig.template;
-        const outputName = docConfig.renderTo;
-        
-        console.log(`\nZpracovávám dokument: ${templateName} -> ${outputName}`);
-        
-        try {
-            // Načti šablonu
-            const templatePath = path.join(__dirname, templateName);
-            
-            if (!fs.existsSync(templatePath)) {
-                console.error(`Chyba: Šablona ${templateName} nebyla nalezena v ${__dirname}`);
-                continue; // Pokračuj dalším dokumentem
-            }
-            
-            const content = fs.readFileSync(templatePath, 'binary');
-            const zip = new PizZip(content);
-            const imageModule = buildImageModule(data.products);
-            
-            const doc = new Docxtemplater(zip, {
-                modules: [imageModule],
-                paragraphLoop: true,
-                linebreaks: true,
-                delimiters: { start: '[[', end: ']]' },
-            });
-
-            // Renderuj s daty
-            doc.render(reportData);
-
-            // Ulož dokument
-            const buf = doc.getZip().generate({ type: 'nodebuffer' });
-            const outPath = path.join(workingDir, outputName);
-            fs.writeFileSync(outPath, buf);
-            
-            console.log(`✓ Dokument vytvořen: ${outPath}`);
-            
-        } catch (error) {
-            console.error(`✗ Chyba při zpracování dokumentu ${templateName}:`, error.message);
-            // Pokračuj dalším dokumentem místo ukončení celého scriptu
-        }
-    }
-    
-    console.log(`\n=== Generování dokumentů dokončeno ===`);
+    // 5) Ulož
+    const buf = doc.getZip().generate({ type: 'nodebuffer' });
+    const outPath = path.join(workingDir, 'report.docx');
+    fs.writeFileSync(outPath, buf);
+    console.log(`Hotovo: ${outPath}`);
 }
 
 
@@ -269,3 +218,154 @@ main().catch(err => {
 });
 
 
+
+
+function normalizeQuotes(str) {
+  return str.replace(/[“”„‟«»‹›]/g, '"');
+}
+
+
+function normalizeProp(prop) {
+/* Rozdělí prop na název a případné parametry ve formátu JSON objektu
+   Vrací [propName, paramsObject|null]
+*/    
+    let params = null;
+    let paramStr;
+    if (typeof prop === "string") {
+        paramStr=prop.split('{').slice(1).join('{');
+        paramStr=normalizeQuotes(paramStr);
+    }
+    if (paramStr) {
+        try {
+            params = JSON.parse(`{${paramStr}`);
+        } catch (e) {
+            console.warn("Chyba při parsování parametrů ", paramStr);
+        }
+    }
+    if (paramStr) {
+        prop=prop.split('{')[0];
+    }   
+    return [prop, params];
+}
+
+
+function formatTemplateDate(iso, { dateFormat, locale, zone } = {}) {
+    const usedFormat = dateFormat ?? DEFAULT_PATTERN;
+    const usedLocale = locale ?? DEFAULT_LOCALE;
+    const usedZone = zone ?? DEFAULT_ZONE;
+    
+    return DateTime.fromSQL(iso, { zone: usedZone }).setLocale(usedLocale).toFormat(usedFormat);
+}
+
+function customizeValue(value, params, pathArr) {
+    // Upraví value dle params (např. formátování data)
+    if (params.dateFormat) {  // ok jde o formátování datumu
+        value = formatTemplateDate(value, params);
+    }
+    // pokud je poslední část pathArr "img", tak jde o obrázek a  vrátíme pathArr
+    if (pathArr[pathArr.length - 1]=='img') {
+        gImgParams.push({params,pathArr});
+        value=gImgParams.length -1;
+    }
+
+    return value;
+}
+
+
+
+/**
+ * Deep logging Proxy (transparentní pro většinu introspekce):
+ * - get: loguje a vrací reálná data (vnořené objekty proxynuje dál)
+ * - has: pro `prop in obj`
+ * - getOwnPropertyDescriptor + ownKeys: pro `hasOwnProperty`, `Object.getOwnPropertyDescriptors`, `Object.keys`, `for...in`, …
+ *
+ * Pozn.: Identita objektu se změní (proxy !== target). Jinak se to chová jako target.
+ */
+
+function createDeepIntrospectingGetLoggerProxy(rootObj, {
+  labelGet = "GET",
+  labelHas = "HAS",
+  labelKeys = "KEYS",
+  labelDesc = "DESC",
+  logSymbols = true,
+} = {}) {
+  if (rootObj === null || (typeof rootObj !== "object" && typeof rootObj !== "function")) {
+    throw new TypeError("rootObj musí být objekt nebo funkce");
+  }
+
+  const cacheByTargetAndPath = new WeakMap(); // target -> Map(pathString -> proxy)
+
+  const isObjectLike = (v) => v !== null && (typeof v === "object" || typeof v === "function");
+
+  const keyToString = (k) => {
+    if (typeof k === "symbol") return logSymbols ? k.toString() : "[symbol]";
+    return String(k);
+  };
+
+  const pathToString = (pathArr) => pathArr.map(keyToString).join(".");
+
+  const getProxy = (target, pathArr) => {
+    let map = cacheByTargetAndPath.get(target);
+    if (!map) {
+      map = new Map();
+      cacheByTargetAndPath.set(target, map);
+    }
+
+    const pathKey = pathToString(pathArr);
+    if (map.has(pathKey)) return map.get(pathKey);
+
+    const proxy = new Proxy(target, {
+      get(t, prop, receiver) {
+        // minimal special-casing: ať runtime nešílí při debug/inspect
+        if (prop === Symbol.toStringTag) return Reflect.get(t, prop, receiver);
+
+        let params;
+        [prop,params]=normalizeProp(prop)
+
+        const nextPath = pathArr.concat([prop]);
+    //    console.log(`[${labelGet}]`, pathToString(nextPath));
+
+        let value = Reflect.get(t, prop, receiver);
+        if (params) {
+            value=customizeValue(value,params,nextPath);
+        }
+        
+        if (prop=='a.b.c.d{"aa":5}') {
+            value=  'A.A.A';
+        }
+        // metody: zachovej this (receiver = proxy)
+        if (typeof value === "function") return value.bind(receiver);
+
+        // vnořené objekty proxynout
+        if (isObjectLike(value)) return getProxy(value, nextPath);
+
+        return value;
+      },
+
+      has(t, prop) {
+        // `prop in obj`
+        const nextPath = pathArr.concat([prop]);
+        console.log(`[${labelHas}]`, pathToString(nextPath));
+        return Reflect.has(t, prop);
+      },
+
+      ownKeys(t) {
+        // `for...in`, `Object.keys`, `Object.getOwnPropertyNames`, …
+        console.log(`[${labelKeys}]`, pathToString(pathArr) || "<root>");
+        return Reflect.ownKeys(t);
+      },
+
+      getOwnPropertyDescriptor(t, prop) {
+        // `hasOwnProperty`, `Object.getOwnPropertyDescriptor(s)`, …
+        const nextPath = pathArr.concat([prop]);
+        console.log(`[${labelDesc}]`, pathToString(nextPath));
+        return Reflect.getOwnPropertyDescriptor(t, prop);
+      },
+    });
+
+    map.set(pathKey, proxy);
+    return proxy;
+  };
+
+  return getProxy(rootObj, []);
+}
