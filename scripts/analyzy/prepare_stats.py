@@ -13,7 +13,7 @@ import sys
 
 import mysql.connector
 
-from dbsettings import get_connection, load_data_json
+from uohs_dbsettings import get_connection, load_data_json
 
 # ======= KONFIGURACE =======
 

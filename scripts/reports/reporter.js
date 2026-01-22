@@ -37,6 +37,7 @@ if (!workingDir) {
 }
 
 let gImgParams=[]; // globální pole parametrů obrázků
+gImgParams.push('a');
 
 // Globální objekt pro data
 let data = {};
@@ -100,9 +101,27 @@ function buildImageModule(allProducts) {
             // tagValue očekáváme jako index produktu (číslo) nebo přímo buffer/filepath
             // V šabloně použijeme {{{img/slozka}}} a do data vložíme id → tady z cache vrátíme buffer.
             let subFolderName = gImgParams[tagValue]?.params?.path;
-            let index = gImgParams[tagValue]?.pathArr.slice(-2,-1)[0]; // předposlední část path je index v poli
-            let filename = data.products[index].id;
-            let imgPath = path.join(`${IMAGES_DIR}/${subFolderName}/${filename}`);
+            let filename = gImgParams[tagValue]?.params?.filename;
+            
+            let index = gImgParams[tagValue]?.pathArr.slice(-2,-1)[0]; // předposlední část path je mozna index v poli
+            let key = gImgParams[tagValue]?.pathArr.slice(-3,-2)[0]; // predpředposlední část path je mozna klic
+            let imgPath;
+            
+            if (data?.[key]?.[index]?.id) {
+                filename = data[key][index].id;
+            }
+            if (subFolderName) {
+                imgPath = path.join(`${IMAGES_DIR}/${subFolderName}/${filename}`);
+            } else {
+                imgPath = path.join(`${IMAGES_DIR}/${filename}`);
+            }
+            
+            if (gImgParams[tagValue]?.params?.product) { // je to obrazek produktu
+                imgPath = path.join(`${PRODUCT_IMG_DIR}/product_${filename}`);
+            }
+
+            
+             
  
             // Pokud je tagValue přímo buffer nebo cesta k souboru, použij to
    
@@ -173,8 +192,8 @@ async function main() {
 
 
 
-    const templatePath = path.join(__dirname, 'template.docx');
-    const content = fs.readFileSync(templatePath, 'binary');
+    // const templatePath = path.join(__dirname, 'template.docx');
+    // const content = fs.readFileSync(templatePath, 'binary');
 
     //let zip = new PizZip(content);
     //fixTagsAndData(zip,reportData);
@@ -308,14 +327,31 @@ function formatTemplateDate(iso, { dateFormat, locale, zone } = {}) {
     const usedFormat = dateFormat ?? DEFAULT_PATTERN;
     const usedLocale = locale ?? DEFAULT_LOCALE;
     const usedZone = zone ?? DEFAULT_ZONE;
-    
+    if (iso.includes('T')) return DateTime.fromISO(iso, { zone: usedZone }).setLocale(usedLocale).toFormat(usedFormat);
     return DateTime.fromSQL(iso, { zone: usedZone }).setLocale(usedLocale).toFormat(usedFormat);
+}
+
+function formatNumber(value, {
+  locale = 'cs-CZ',
+  minDecimals = 0,
+  maxDecimals = 5,
+  useGrouping = true
+} = {}) {
+  return new Intl.NumberFormat(locale, {
+    minimumFractionDigits: minDecimals,
+    maximumFractionDigits: maxDecimals,
+    useGrouping
+  }).format(value);
 }
 
 function customizeValue(value, params, pathArr) {
     // Upraví value dle params (např. formátování data)
     if (params.dateFormat) {  // ok jde o formátování datumu
         value = formatTemplateDate(value, params);
+    }
+
+    if (params.numFormat) {  // ok jde o formátování datumu
+        value = formatNumber(value, params.numFormat);
     }
     // pokud je poslední část pathArr "img", tak jde o obrázek a  vrátíme pathArr
     if (pathArr[pathArr.length - 1]=='img') {
@@ -378,16 +414,16 @@ function createDeepIntrospectingGetLoggerProxy(rootObj, {
         [prop,params]=normalizeProp(prop)
 
         const nextPath = pathArr.concat([prop]);
-    //    console.log(`[${labelGet}]`, pathToString(nextPath));
+        console.log(`[${labelGet}]`, pathToString(nextPath));
 
         let value = Reflect.get(t, prop, receiver);
         if (params) {
             value=customizeValue(value,params,nextPath);
         }
-        
+        /*
         if (prop=='a.b.c.d{"aa":5}') {
             value=  'A.A.A';
-        }
+        }*/
         // metody: zachovej this (receiver = proxy)
         if (typeof value === "function") return value.bind(receiver);
 

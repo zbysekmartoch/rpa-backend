@@ -28,8 +28,8 @@ if (!Array.isArray(data.report.doc)) {
 
 // Prvky, které chceme přidat
 const newDocs = [
-  { template: 'templateM.docx', renderTo: 'Manažerský výstup.docx' },
-  { template: 'templateUZ.docx', renderTo: 'Záznam o provedení analýzy.docx' },
+  { template: 'template_RPM_manazersky.docx', renderTo: 'Manažerský výstup.docx' },
+  { template: 'template_RPM.docx', renderTo: 'Záznam o provedení analýzy.docx' },
 ];
 
 // Přidá jen pokud už tam nejsou (podle `template`)

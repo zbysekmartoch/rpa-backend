@@ -19,7 +19,7 @@ join price on price.product_id=product.id
 WHERE bp.basket_id = %s AND price.date BETWEEN %s AND %s
 """
 
-OUT_CSV = "export.csv"
+OUT_CSV = "data.csv"
 
 CSV_DELIMITER = ";"          # např. ';' nebo ','
 CSV_QUOTECHAR = '"'          # typicky '"'
