@@ -47,6 +47,22 @@ try {
   };
 }
 
+// Zámek pro atomické provádění workflow sekvencí
+// Zajišťuje, že pouze jedna analýza běží najednou, ostatní čekají ve frontě
+let workflowLockPromise = Promise.resolve();
+
+/**
+ * Získá zámek pro spuštění workflow.
+ * Vrací funkci release, která zámek uvolní.
+ */
+function acquireWorkflowLock() {
+  let release;
+  const myTurn = workflowLockPromise;
+  workflowLockPromise = new Promise(resolve => {
+    release = resolve;
+  });
+  return { waitForLock: myTurn, release };
+}
 
 const router = Router();
 
@@ -343,10 +359,9 @@ async function executeWorkflowSteps({ resultId, steps, resultDir, logFile, error
   // Odfiltrovat komentáře (začínající #) před prováděním
   const activeSteps = (steps || []).filter(s => !s.startsWith('#'));
   const progressFile = path.join(resultDir, 'progress.json');
-  const analysisStartTime = new Date().toISOString();
   
   // Pomocná funkce pro zápis progress
-  async function writeProgress(currentStep, stepName, stepStartTime, status = 'running') {
+  async function writeProgress(currentStep, stepName, stepStartTime, status = 'running', analysisStartTime = null) {
     const progress = {
       status,
       totalSteps: activeSteps.length,
@@ -359,64 +374,84 @@ async function executeWorkflowSteps({ resultId, steps, resultDir, logFile, error
     await fs.writeFile(progressFile, JSON.stringify(progress, null, 2));
   }
   
-  if (activeSteps.length) {
-    for (let i = 0; i < activeSteps.length; i++) {
-      const step = activeSteps[i];
-      const stepStartTime = new Date().toISOString();
-      
-      // Zapíšeme progress před spuštěním kroku
-      await writeProgress(i + 1, step, stepStartTime, 'running');
-      
-      console.log(`${logPrefix}Executing step: ${step}`);
-      const success = await runScript(step, resultDir, logFile, errorFile);
-      
-      if (!success) {
-        // Zapíšeme failed progress
-        await writeProgress(i + 1, step, stepStartTime, 'failed');
+  // Získáme zámek - čekáme ve frontě na spuštění
+  const { waitForLock, release } = acquireWorkflowLock();
+  
+  // Zapíšeme stav čekání před získáním zámku
+  await writeProgress(0, 'Waiting for analytical engine', new Date().toISOString(), 'waiting', null);
+  console.log(`${logPrefix}Waiting for analytical engine lock...`);
+  
+  // Čekáme na uvolnění zámku (předchozí analýza musí doběhnout)
+  await waitForLock;
+  
+  console.log(`${logPrefix}Lock acquired, starting workflow execution`);
+  
+  const analysisStartTime = new Date().toISOString();
+  
+  try {
+      if (activeSteps.length) {
+      for (let i = 0; i < activeSteps.length; i++) {
+        const step = activeSteps[i];
+        const stepStartTime = new Date().toISOString();
         
-        await query(
-          'UPDATE result SET status = ?, completed_at = NOW() WHERE id = ?',
-          ['failed', resultId]
-        );
+        // Zapíšeme progress před spuštěním kroku
+        await writeProgress(i + 1, step, stepStartTime, 'running', analysisStartTime);
         
-        // Zapíšeme chybu do log souboru
-        const failTimestamp = new Date().toISOString();
-        const failSeparator = config.logging.separatorChar.repeat(config.logging.separatorLength);
-        const failMsg = `\n${failSeparator}\n[${failTimestamp}] ${logPrefix}ANALYSIS FAILED at step: ${step}\n${failSeparator}\n`;
-        await fs.appendFile(logFile, failMsg);
-        await fs.appendFile(errorFile, failMsg);
+        console.log(`${logPrefix}Executing step: ${step}`);
+        const success = await runScript(step, resultDir, logFile, errorFile);
         
-        return false;
+        if (!success) {
+          // Zapíšeme failed progress
+          await writeProgress(i + 1, step, stepStartTime, 'failed', analysisStartTime);
+          
+          await query(
+            'UPDATE result SET status = ?, completed_at = NOW() WHERE id = ?',
+            ['failed', resultId]
+          );
+          
+          // Zapíšeme chybu do log souboru
+          const failTimestamp = new Date().toISOString();
+          const failSeparator = config.logging.separatorChar.repeat(config.logging.separatorLength);
+          const failMsg = `\n${failSeparator}\n[${failTimestamp}] ${logPrefix}ANALYSIS FAILED at step: ${step}\n${failSeparator}\n`;
+          await fs.appendFile(logFile, failMsg);
+          await fs.appendFile(errorFile, failMsg);
+          
+          return false;
+        }
       }
     }
+    
+    // Vše proběhlo úspěšně - zapíšeme completed progress
+    const completedProgress = {
+      status: 'completed',
+      totalSteps: activeSteps.length,
+      currentStep: activeSteps.length,
+      currentStepName: activeSteps.length > 0 ? activeSteps[activeSteps.length - 1] : null,
+      stepStartedAt: null,
+      analysisStartedAt: analysisStartTime,
+      completedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    await fs.writeFile(progressFile, JSON.stringify(completedProgress, null, 2));
+    
+    await query(
+      'UPDATE result SET status = ?, completed_at = NOW() WHERE id = ?',
+      ['completed', resultId]
+    );
+    
+    // Zapíšeme úspěch do log souboru
+    const completedTimestamp = new Date().toISOString();
+    const successSeparator = config.logging.separatorChar.repeat(config.logging.separatorLength);
+    const successMsg = `\n${successSeparator}\n[${completedTimestamp}] ${logPrefix}ANALYSIS COMPLETED SUCCESSFULLY\nResult ID: ${resultId}\nTotal steps executed: ${activeSteps.length}\n${successSeparator}\n`;
+    await fs.appendFile(logFile, successMsg);
+    await fs.appendFile(errorFile, successMsg);
+    
+    return true;
+  } finally {
+    // Vždy uvolníme zámek, i když dojde k chybě
+    release();
+    console.log(`${logPrefix}Lock released`);
   }
-  
-  // Vše proběhlo úspěšně - zapíšeme completed progress
-  const completedProgress = {
-    status: 'completed',
-    totalSteps: activeSteps.length,
-    currentStep: activeSteps.length,
-    currentStepName: activeSteps.length > 0 ? activeSteps[activeSteps.length - 1] : null,
-    stepStartedAt: null,
-    analysisStartedAt: analysisStartTime,
-    completedAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
-  await fs.writeFile(progressFile, JSON.stringify(completedProgress, null, 2));
-  
-  await query(
-    'UPDATE result SET status = ?, completed_at = NOW() WHERE id = ?',
-    ['completed', resultId]
-  );
-  
-  // Zapíšeme úspěch do log souboru
-  const completedTimestamp = new Date().toISOString();
-  const successSeparator = config.logging.separatorChar.repeat(config.logging.separatorLength);
-  const successMsg = `\n${successSeparator}\n[${completedTimestamp}] ${logPrefix}ANALYSIS COMPLETED SUCCESSFULLY\nResult ID: ${resultId}\nTotal steps executed: ${activeSteps.length}\n${successSeparator}\n`;
-  await fs.appendFile(logFile, successMsg);
-  await fs.appendFile(errorFile, successMsg);
-  
-  return true;
 }
 
 async function runAnalysis(analysisId, settings) {

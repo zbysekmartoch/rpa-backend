@@ -431,9 +431,12 @@ Returns analysis result detail including progress info and list of available DOC
 ```
 
 **Progress states:**
+- `waiting` - Analysis is waiting in queue for analytical engine (another analysis is running)
 - `running` - Analysis is running, `stepElapsedMs` shows current step time
 - `completed` - All steps completed successfully
 - `failed` - Analysis failed on some step
+
+**Note:** Workflow execution is atomic - only one analysis can run at a time. If another analysis is already running, new analyses will wait in a queue with status `waiting` and `currentStepName: "Waiting for analytical engine"`.
 
 ### POST `/api/v1/results/:id/debug`
 Runs analysis in debug mode - uses existing result and its data.json.

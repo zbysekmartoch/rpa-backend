@@ -13,7 +13,8 @@ REST API for managing products, baskets, analyses, harvesters, and harvest sched
 - 📦 Product Management with price statistics
 - 🛒 Basket Management
 - 📊 Analysis with Workflow Scripts
-- 📁 ZIP Export of Results
+- � Atomic Workflow Execution (queue for concurrent analyses)
+- �📁 ZIP Export of Results
 - 🤖 Harvester Management with API forwarding
 - 🕐 Harvest Scheduling with automatic synchronization
 - 📡 Data Sources Management
