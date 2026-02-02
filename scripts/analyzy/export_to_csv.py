@@ -12,7 +12,7 @@ from uohs_dbsettings import get_connection, load_data_json  # <--- tady
 BASKET_ID = 123  # <-- sem dej hodnotu pro WHERE b.basket_id = %s
 
 SQL = """
-select product.id, product.name, product.brand, product.category, price.date, price.price from bp
+select product.id, product.name, product.brand, product.category, price.date, price.price, price.seller from bp
 join product on product.id=bp.product_id
 join price on price.product_id=product.id
 

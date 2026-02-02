@@ -78,7 +78,8 @@ def main():
             min(price_stat_i1.min_price) Pmin,
             max(price_stat_i1.max_price) Pmax,
             min(price_stat_i1.mode_price) Pmode,
-            avg(price_stat_i1.dib) avg_diB
+            avg(price_stat_i1.dib) avg_diB,
+            avg(price_stat_i1.ib) avg_iB
             from price_stat_i1
             join bp on bp.basket_id={data['basketId']} and bp.product_id=price_stat_i1.product_id
             join product on product.id=price_stat_i1.product_id
