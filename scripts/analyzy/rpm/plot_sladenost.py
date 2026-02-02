@@ -117,7 +117,8 @@ def plot_for_each_product(df: pd.DataFrame, output_dir: str):
         
         # Red horizontal lines at y=0.4 and y=0.7
         ax.axhline(0.4, color="#d70c0f", linestyle="--", linewidth=0.5)
-        ax.axhline(0.7, color="#d70c0f", linestyle="--", linewidth=0.5)   
+        ax.axhline(0.7, color="#d70c0f", linestyle="--", linewidth=0.5)
+        ax.axhline(0.9, color="#d70c0f", linestyle="--", linewidth=0.5)   
         
         # Legend below axes
         ax.legend(

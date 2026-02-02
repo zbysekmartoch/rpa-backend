@@ -72,11 +72,11 @@ def main():
     SQL_QUERIES = [
         """DROP TABLE IF EXISTS a_desc1""",
         f""" create table a_desc1 as
-            select product.id,product.name, sum(price_stat_i1.seller_count) N,
+            select product.id,product.name,product.brand, sum(price_stat_i1.seller_count) N,
             min(price_stat_i1.seller_count) Nmin,
             max(price_stat_i1.seller_count) Nmax,
             min(price_stat_i1.min_price) Pmin,
-            max(price_stat_i1.min_price) Pmax,
+            max(price_stat_i1.max_price) Pmax,
             min(price_stat_i1.mode_price) Pmode,
             avg(price_stat_i1.dib) avg_diB
             from price_stat_i1
@@ -226,7 +226,7 @@ def main():
         """DROP TABLE IF EXISTS b_desc""",
         f"""          
             CREATE TABLE b_desc AS
-            select a.date,a.brand,count(distinct a.product_id) Nprod, a.wiB/sum(a.seller_count) iB,
+            select a.date,a.brand,count(distinct a.product_id) Nprod, SUM(a.iB) / COUNT(DISTINCT a.product_id) iB,
             sum(a.seller_count) Nprice
             from (
             SELECT
@@ -234,7 +234,7 @@ def main():
             sqrt((s.on_par*s.on_par+(min_price/mode_price)*(min_price/mode_price))/2) iB
             , s.product_id, p2.brand,
             s.seller_count,
-            sqrt((s.on_par*s.on_par+(min_price/mode_price)*(min_price/mode_price))/2)*s.seller_count wiB
+            sqrt((s.on_par*s.on_par+(min_price/mode_price)*(min_price/mode_price))/2)*s.seller_count wiB #už se wiB k ničemu nepoužívá, ale nedovolil jsem si smazat
             FROM bp b
             JOIN price_stat_i1 s
             ON s.product_id = b.product_id

@@ -72,12 +72,13 @@ def main():
     SQL_QUERIES = [
         """DROP TABLE IF EXISTS a_desc1""",
         f""" create table a_desc1 as
-            select product.id,product.name, sum(price_stat_i1.seller_count) N,
+            select product.id,product.name,product.brand, sum(price_stat_i1.seller_count) N,
             min(price_stat_i1.seller_count) Nmin,
             max(price_stat_i1.seller_count) Nmax,
             min(price_stat_i1.min_price) Pmin,
-            max(price_stat_i1.min_price) Pmax,
-            min(price_stat_i1.mode_price) Pmode
+            max(price_stat_i1.max_price) Pmax,
+            min(price_stat_i1.mode_price) Pmode,
+            avg(price_stat_i1.dib) avg_diB
             from price_stat_i1
             join bp on bp.basket_id={data['basketId']} and bp.product_id=price_stat_i1.product_id
             join product on product.id=price_stat_i1.product_id

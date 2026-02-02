@@ -11,6 +11,7 @@ import matplotlib.dates as mdates
 import matplotlib.ticker as mticker
 from sklearn.linear_model import LinearRegression
 import numpy as np
+import math
 import statsmodels.api as sm
 from PIL import Image
 from IPython.display import display
@@ -86,12 +87,26 @@ def linear_regression(df: pd.DataFrame):
 
         model = sm.OLS(y, X).fit()
 
+        
+        def n(x):
+            if x is None:
+                return None
+            try:
+                xf = float(x)
+            except (TypeError, ValueError):
+                return None
+            if math.isnan(xf) or math.isinf(xf):
+                return None
+            return round(xf, 4)
+        #    return None if np.isnan(x) else float(x)
+        
+                    
         results.append({
             "id": product_id,
-            "beta_Np": model.params[1],
-            "beta_SE": model.bse[1],
-            "p_value": model.pvalues[1],
-            "R_squared": model.rsquared,
+            "beta_Np": n(model.params[1]),  
+            "beta_SE": n(model.bse[1]),
+            "p_value": n(model.pvalues[1]),
+            "R_squared": n(model.rsquared),
             "N": len(grp)
         })
 

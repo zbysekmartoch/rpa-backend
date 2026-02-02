@@ -108,10 +108,9 @@ def plot_for_each_product(df: pd.DataFrame, output_dir: str):
         
         plt.setp(ax.get_xticklabels(), rotation=45, ha='right', va='top', fontsize=6.5)
         plt.setp(ax.get_yticklabels(), fontsize=6.5)
-        ax.set_ylim(0, 1)
+        ax.set_ylim(0.5, 1.5)
         
-        ax.axhline(0.8, color="#d70c0f", linestyle="--", linewidth=0.5)
-        ax.axhline(0.9, color="#d70c0f", linestyle="--", linewidth=0.5) 
+        ax.axhline(1, color="#d70c0f", linestyle="--", linewidth=0.5)         
         
         # Legend below axes
         ax.legend(

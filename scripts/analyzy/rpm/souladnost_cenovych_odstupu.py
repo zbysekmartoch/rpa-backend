@@ -131,7 +131,7 @@ def plot_for_each_product(df: pd.DataFrame, output_dir: str):
             X_pred = sm.add_constant(x_range)
             y_pred = model.predict(X_pred)
             ax.plot(y_pred, x_range, color="#d70c0f", linewidth=0.5, linestyle="-",
-                    label=f"OLS: dA = {model.params[0]:.2f} + {model.params[1]:.2f}dB")
+                    label=f"OLS: dA = {model.params[0]:.2f} + {model.params[1]:.2f} dB")
         else:
             # Add a dummy invisible line so it appears in legend
             ax.plot([], [], color="none", label="OLS not estimated")

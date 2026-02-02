@@ -87,8 +87,8 @@ def plot_for_each_product(df: pd.DataFrame, output_dir: str):
 
         
         # Define dependent and independent variables
-        y_dep = grp["iB"].values                  # dependent: dA
-        X_indep = grp["seller_count"].values      # independent: dB
+        y_dep = grp["iB"].values                  # dependent: iB
+        X_indep = grp["seller_count"].values      # independent: Nmaxt
         X = sm.add_constant(X_indep)              # add intercept column
 
         # Fit OLS model
@@ -133,7 +133,7 @@ def plot_for_each_product(df: pd.DataFrame, output_dir: str):
             X_pred = sm.add_constant(x_range)
             y_pred = model.predict(X_pred)
             ax.plot(x_range, y_pred, color="#d70c0f", linewidth=0.5, linestyle="-",
-                    label=f"OLS: dA = {model.params[0]:.2f} + {model.params[1]:.2f}dB")
+                    label=f"OLS: iBt = {model.params[0]:.2f} + {model.params[1]:.2f} Nmaxt")  
         else:
             # Add a dummy invisible line so it appears in legend
             ax.plot([], [], color="none", label="OLS not estimated")
@@ -145,8 +145,8 @@ def plot_for_each_product(df: pd.DataFrame, output_dir: str):
         # Diagonal line
         ax.plot([max(grp["seller_count"]), 0], [0, 1], color='#d70c0f', linewidth=0.5, linestyle='--', label='Diagonal')
         
-        ax.set_xlabel("Np", fontsize=7)
-        ax.set_ylabel("iB", fontsize=7, rotation=0)
+        ax.set_xlabel("Nmaxt", fontsize=7)
+        ax.set_ylabel("iBt", fontsize=7, rotation=0)
         ax.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
         ax.xaxis.set_major_locator(MaxNLocator(integer=True))
         plt.setp(ax.get_xticklabels(), fontsize=6.5)

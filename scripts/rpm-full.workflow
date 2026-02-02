@@ -1,4 +1,4 @@
-analyzy/prepare_stats.py
+analyzy/rpm/prepare_stats.py
 analyzy/prepareOutput.js
 analyzy/rpm/histogram.py
 analyzy/rpm/souladnost_cenovych_odstupu.py
@@ -12,6 +12,7 @@ analyzy/rpm/plot_sladenost.py
 analyzy/rpm/scatterplot_nP_iB.py
 analyzy/rpm/scatterplot_sladenost_cenovy_odstup_b.py
 analyzy/rpm/regression_iP_Np.py
+analyzy/rpm/regression_dA_dB.py
 analyzy/export_to_csv.py
 dump_sources.js
 reports/requestReports.cjs

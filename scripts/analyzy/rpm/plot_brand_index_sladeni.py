@@ -132,8 +132,8 @@ def plot_brand_index(df: pd.DataFrame, output_path: str):
     ax.set_ylim(0, 1)
     
     # Referenční čáry
-    ax.axhline(0.8, color="#d70c0f", linestyle="--", linewidth=0.5, alpha=0.5, zorder=1)
-    ax.axhline(0.9, color="#d70c0f", linestyle="--", linewidth=0.5, alpha=0.5, zorder=1)
+    ax.axhline(0.4, color="#d70c0f", linestyle="--", linewidth=0.5, alpha=0.5, zorder=1)
+    ax.axhline(0.6, color="#d70c0f", linestyle="--", linewidth=0.5, alpha=0.5, zorder=1)
     
     # Popisky os
     ax.set_xlabel("Datum", fontsize=8)
