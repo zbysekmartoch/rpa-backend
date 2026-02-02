@@ -346,20 +346,39 @@ function formatNumber(value, {
 
 function customizeValue(value, params, pathArr) {
     // Upraví value dle params (např. formátování data)
+    let ret = value;
     if (params.dateFormat) {  // ok jde o formátování datumu
-        value = formatTemplateDate(value, params);
+        ret = formatTemplateDate(value, params);
     }
 
     if (params.numFormat) {  // ok jde o formátování datumu
-        value = formatNumber(value, params.numFormat);
+        ret = formatNumber(value, params.numFormat);
     }
     // pokud je poslední část pathArr "img", tak jde o obrázek a  vrátíme pathArr
     if (pathArr[pathArr.length - 1]=='img') {
         gImgParams.push({params,pathArr});
-        value=gImgParams.length -1;
+        ret=gImgParams.length -1;
     }
 
-    return value;
+    if (params.orderBy && Array.isArray(value)) {
+        ret = [...value]; // clone
+        // podporuje víceúrovňové řazení. params.orderby je string "key1,key2 desc,key3"
+        const orderBys = params.orderBy.split(',').map(s => {
+            const [key, dir] = s.trim().split(' ');
+            return { key, desc: dir && dir.toLowerCase() === 'desc' };
+        });
+
+        ret.sort((a, b) => {
+            for (const { key, desc } of orderBys) {
+                if (a[key] < b[key]) return desc ? 1 : -1;
+                if (a[key] > b[key]) return desc ? -1 : 1;
+            }
+            return 0;
+        }); 
+        
+    }
+
+    return ret;
 }
 
 
@@ -420,10 +439,7 @@ function createDeepIntrospectingGetLoggerProxy(rootObj, {
         if (params) {
             value=customizeValue(value,params,nextPath);
         }
-        /*
-        if (prop=='a.b.c.d{"aa":5}') {
-            value=  'A.A.A';
-        }*/
+ 
         // metody: zachovej this (receiver = proxy)
         if (typeof value === "function") return value.bind(receiver);
 
